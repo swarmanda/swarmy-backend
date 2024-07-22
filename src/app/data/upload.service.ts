@@ -1,16 +1,18 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { UploadResultDto } from './upload.result.dto';
 import { User } from '../user/user.schema';
-import { QuotaMetricsService } from './quota-metrics.service';
+import { UsageMetricsService } from './usage-metrics.service';
 import { FileReferenceService } from './file.service';
 import { BeeService } from '../bee/bee.service';
 import { Readable } from 'stream';
 import { Organization } from '../organization/organization.schema';
 
+const BEE_MIN_CHUNK_SIZE = 4000;
+
 @Injectable()
 export class UploadService {
   constructor(
-    private quotaMetricsService: QuotaMetricsService,
+    private uploadMetricsService: UsageMetricsService,
     private fileReferenceService: FileReferenceService,
     private beeService: BeeService,
   ) {}
@@ -24,8 +26,18 @@ export class UploadService {
       throw new BadRequestException(`File already uploaded, reference: ${result.reference}`);
     }
 
+    const size = this.roundUp(file.size, BEE_MIN_CHUNK_SIZE);
     await this.fileReferenceService.createFileReference(result.reference, organization, file, user);
-    await this.quotaMetricsService.handleUploadEvent(organization, file.size);
+    await this.uploadMetricsService.increment(organization, 'UPLOADED_BYTES', size, 'LIFETIME');
     return { url: result.reference };
+  }
+
+  roundUp(numToRound: number, multiple: number) {
+    if (multiple === 0) return numToRound;
+
+    const remainder = numToRound % multiple;
+    if (remainder === 0) return numToRound;
+
+    return numToRound + multiple - remainder;
   }
 }

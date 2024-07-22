@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { UploadResultDto } from './upload.result.dto';
-import { QuotaMetricsService } from './quota-metrics.service';
+import { UsageMetricsService } from './usage-metrics.service';
 import { FileReferenceService } from './file.service';
 import { BeeService } from '../bee/bee.service';
 import { DownloadResult } from './download-result';
@@ -9,7 +8,7 @@ import { Organization } from '../organization/organization.schema';
 @Injectable()
 export class DownloadService {
   constructor(
-    private quotaMetricsService: QuotaMetricsService,
+    private usageMetricsService: UsageMetricsService,
     private fileReferenceService: FileReferenceService,
     private beeService: BeeService,
   ) {}
@@ -20,7 +19,8 @@ export class DownloadService {
       throw new NotFoundException();
     }
     const result = await this.beeService.download(hash);
-    this.quotaMetricsService.handleDownloadEvent(fileRef).catch((e) => {
+
+    this.usageMetricsService.increment(org, 'DOWNLOADED_BYTES', fileRef.size).catch((e) => {
       console.error('Failed to handle download event', e);
     });
 

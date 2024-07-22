@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Param, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadResultDto } from './upload.result.dto';
@@ -7,10 +7,9 @@ import { UserInContext } from '../user/user.decorator';
 import { User } from '../user/user.schema';
 import { FileReferenceService } from './file.service';
 import { DownloadService } from './download.service';
-import { Multer } from 'multer';
 import { ApiKeyGuard } from '../api-key/api-key.guard';
 import { Public } from '../auth/public.decorator';
-import { QuotaMetricsService } from './quota-metrics.service';
+import { UsageMetricsService } from './usage-metrics.service';
 import { Response } from 'express';
 import { Buffer } from 'safe-buffer';
 import { OrganizationInContext } from '../organization/organization.decorator';
@@ -22,7 +21,7 @@ export class DataController {
     private readonly uploadService: UploadService,
     private readonly downloadService: DownloadService,
     private readonly fileReferenceService: FileReferenceService,
-    private readonly quotaMetricsService: QuotaMetricsService,
+    private readonly usageMetricsService: UsageMetricsService,
   ) {}
 
   @Post('files')
@@ -57,14 +56,18 @@ export class DataController {
       contentType: f.contentType,
       size: f.size,
       hits: f.hits,
-      createdAt: f['createdAt']
+      createdAt: f['createdAt'],
     }));
   }
 
   @Public()
   @UseGuards(ApiKeyGuard)
   @Get('files/:hash')
-  async downloadFile(@OrganizationInContext() org: Organization, @Param('hash') hash: string, @Res() response: Response) {
+  async downloadFile(
+    @OrganizationInContext() org: Organization,
+    @Param('hash') hash: string,
+    @Res() response: Response,
+  ) {
     try {
       const result = await this.downloadService.download(org, hash);
       return response.status(200).contentType(result.contentType).send(Buffer.from(result.data.buffer));
@@ -78,8 +81,8 @@ export class DataController {
     return this.fileReferenceService.getFileReferences(user.organizationId);
   }
 
-  @Get('quota-metrics')
-  getQuotaMetricsForOrganization(@UserInContext() user: User) {
-    return this.quotaMetricsService.getForOrganization(user.organizationId);
+  @Get('usage-metrics')
+  getUsageMetricsForOrganization(@UserInContext() user: User) {
+    return this.usageMetricsService.getForOrganization(user.organizationId);
   }
 }

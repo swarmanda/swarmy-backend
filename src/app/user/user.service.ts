@@ -4,7 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { User } from './user.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import { QuotaMetricsService } from '../data/quota-metrics.service';
+import { UsageMetricsService } from '../data/usage-metrics.service';
 import { OrganizationService } from '../organization/organization.service';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
@@ -14,7 +14,7 @@ export class UserService {
     @InjectPinoLogger(UserService.name)
     private readonly logger: PinoLogger,
     @InjectModel(User.name) private userModel: Model<User>,
-    private quotaMetricsService: QuotaMetricsService,
+    // private usageMetricsService: UsageMetricsService,
     private organizationService: OrganizationService,
   ) {}
 
@@ -33,7 +33,7 @@ export class UserService {
     }).save();
 
     this.logger.info('User created: %s', savedUser.email);
-    await this.quotaMetricsService.create(savedUser);
+    // await this.usageMetricsService.create(savedUser);
   }
 
   private async verifyUniqueUsername(email: string) {

@@ -45,7 +45,7 @@ export class FileReferenceService {
     return ['image/png', 'image/jpeg', 'image/webp'].includes(mimetype);
   }
 
-  private async createThumbnail(file: Express.Multer.File): Promise<String | null> {
+  private async createThumbnail(file: Express.Multer.File): Promise<string | null> {
     if (this.isImage(file.mimetype)) {
       return await imageThumbnail(Buffer.from(file.buffer), {
         width: 100,

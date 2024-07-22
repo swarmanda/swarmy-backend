@@ -27,6 +27,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "image-thumbnail": "^1.0.15",
     "mongoose": "^8.4.1",
+    "mongoose-long": "^0.8.0",
     "nestjs-pino": "^4.1.0",
     "node-base64-image": "^2.0.6",
     "pino-http": "^10.2.0",
