@@ -17,7 +17,7 @@ export class UploadService {
 
   async uploadFile(organization: Organization, file: Express.Multer.File, user?: User): Promise<UploadResultDto> {
     const stream = Readable.from(file.buffer);
-    const result = await this.beeService.upload(organization.postageBatchId, stream);
+    const result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname);
 
     const fileRef = await this.fileReferenceService.getFileReference(organization, result.reference);
     if (fileRef) {

@@ -50,24 +50,25 @@ export class BillingService {
 
   async initSubscriptionProcess(user: User, payload: StartSubscriptionDto) {
     //todo validate
-    //todo consider merging phase 2
 
-    // const template = await this.planService.getPlanTemplateById(planTemplateId);
-    const selectedStorageOption = subscriptionConfig.storageCapacity.options.find((o) => o.value === payload.uploadSizeLimit);
-    const selectedBandwidthOption = subscriptionConfig.bandwidth.options.find((o) => o.value === payload.downloadSizeLimit);
+    const selectedStorageOption = subscriptionConfig.storageCapacity.options.find(
+      (o) => o.size === payload.uploadSizeLimit,
+    );
+    const selectedBandwidthOption = subscriptionConfig.bandwidth.options.find(
+      (o) => o.size === payload.downloadSizeLimit,
+    );
 
     if (!selectedStorageOption || !selectedBandwidthOption) {
       this.logger.error('Invalid pricing provided %o', payload);
       throw new BadRequestException('Invalid request');
     }
-    const storageCapacity = 2 ** selectedStorageOption.value
-    const bandwidth  = 2 ** selectedBandwidthOption.value
-    const storageAmount = storageCapacity * subscriptionConfig.storageCapacity.pricePerGb
-    const bandwidthAmount = bandwidth * subscriptionConfig.bandwidth.pricePerGb
+    const storageCapacity = selectedStorageOption.size;
+    const bandwidth = selectedBandwidthOption.size;
+    const storageAmount = storageCapacity * subscriptionConfig.storageCapacity.pricePerGb;
+    const bandwidthAmount = bandwidth * subscriptionConfig.bandwidth.pricePerGb;
 
-    const total = storageAmount + bandwidthAmount
-    const totalCents = Math.round((total + Number.EPSILON) * 100)
-
+    const total = storageAmount + bandwidthAmount;
+    const totalCents = Math.round((total + Number.EPSILON) * 100);
 
     const plan = await this.planService.createPlan({
       organizationId: user.organizationId,
@@ -79,11 +80,11 @@ export class BillingService {
         uploadSizeLimit: storageCapacity * 1024 * 1024 * 1024,
         downloadSizeLimit: bandwidth * 1024 * 1024 * 1024,
         downloadCountLimit: 100_000,
-        uploadCountLimit: 100_000
+        uploadCountLimit: 100_000,
       },
     });
 
-    this.logger.info(`Initializing payment. User: ${user._id} Amount: ${plan.amount} ${plan.currency}` )
+    this.logger.info(`Initializing payment. User: ${user._id} Amount: ${plan.amount} ${plan.currency}`);
     const result = this.paymentProviderService.initPayment(
       user.organizationId,
       plan._id.toString(),

@@ -9,11 +9,6 @@ import { subscriptionConfig } from './subscription.constants';
 export class PlanController {
   constructor(private readonly planService: PlanService) {}
 
-  @Get('/templates')
-  getPlanTemplates() {
-    return this.planService.getEnabledPlanTemplates();
-  }
-
   @Public()
   @Get('/config')
   getSubscriptionConfig() {

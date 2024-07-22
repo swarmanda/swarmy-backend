@@ -15,8 +15,8 @@ export class BeeService {
     return await this.bee.downloadFile(hash);
   }
 
-  async upload(postageBatchId: string, data: Readable) {
-    return await this.bee.uploadFile(postageBatchId, data);
+  async upload(postageBatchId: string, data: Readable, fileName: string) {
+    return await this.bee.uploadFile(postageBatchId, data, fileName);
   }
 
   async getAllPostageBatches() {
