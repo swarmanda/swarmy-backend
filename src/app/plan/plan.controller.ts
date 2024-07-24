@@ -33,9 +33,4 @@ export class PlanController {
       }
     );
   }
-
-  @Post('/deactivate')
-  deactivatePlan(@UserInContext() user: User) {
-    return this.planService.deactivatePlan(user.organizationId);
-  }
 }

@@ -26,6 +26,9 @@ export class Plan {
   @Prop({ required: true })
   status: PlanStatus;
 
+  @Prop()
+  statusReason: string;
+
   @Prop({ required: true, type: PlanQuota })
   quotas: PlanQuota;
   //

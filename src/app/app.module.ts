@@ -69,6 +69,7 @@ import { v4 as uuidv4 } from 'uuid';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
         uri: configService.get<string>('DATABASE_URL'),
+        dbName: configService.get<string>('DATABASE_NAME'),
         auth: {
           password: configService.get<string>('DATABASE_PASSWORD'),
           username: configService.get<string>('DATABASE_USERNAME'),

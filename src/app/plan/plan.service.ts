@@ -10,8 +10,7 @@ export class PlanService {
     @InjectPinoLogger(PlanService.name)
     private readonly logger: PinoLogger,
     @InjectModel(Plan.name) private planModel: Model<Plan>,
-  ) {
-  }
+  ) {}
 
   async createPlan(plan: Partial<Plan>): Promise<Plan> {
     return (await new this.planModel({
@@ -34,15 +33,17 @@ export class PlanService {
       throw new BadRequestException('There is already an active plan for this organization', organizationId);
     }
 
-    const plan = (await this.planModel.findOneAndUpdate({ _id: planId }, { status: 'ACTIVE' })) as Plan;
+    const plan = await this.updatePlan(planId, { status: 'ACTIVE' });
     this.logger.info('Plan activated ', plan._id);
     return plan;
   }
 
-  async deactivatePlan(organizationId: string) {
+  async cancelActivePlan(organizationId: string) {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
-    const plan = (await this.planModel.findOneAndUpdate({ _id: existingActivePlan._id }, { status: 'CANCELLED' })) as Plan;
-    // todo cancel stripe subscription
-    // todo update quotas?
+    return await this.updatePlan(existingActivePlan._id.toString(), { status: 'CANCELLED' });
+  }
+
+  async updatePlan(_id: string, update: Partial<Plan>): Promise<Plan> {
+    return (await this.planModel.findOneAndUpdate({ _id }, update)) as Plan;
   }
 }

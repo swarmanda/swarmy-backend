@@ -20,7 +20,7 @@ export class DownloadService {
     }
     const result = await this.beeService.download(hash);
 
-    this.usageMetricsService.increment(org, 'DOWNLOADED_BYTES', fileRef.size).catch((e) => {
+    this.usageMetricsService.increment(org._id.toString(), 'DOWNLOADED_BYTES', fileRef.size).catch((e) => {
       console.error('Failed to handle download event', e);
     });
 

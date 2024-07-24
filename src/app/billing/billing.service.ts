@@ -9,6 +9,9 @@ import Stripe from 'stripe';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { StartSubscriptionDto } from './start-subscription.dto';
 import { subscriptionConfig } from '../plan/subscription.constants';
+import { UsageMetricsService } from '../data/usage-metrics.service';
+import { Plan } from '../plan/plan.schema';
+import { Organization } from '../organization/organization.schema';
 
 @Injectable()
 export class BillingService {
@@ -20,6 +23,7 @@ export class BillingService {
     private paymentService: PaymentService,
     private beeService: BeeService,
     private organizationService: OrganizationService,
+    private usageMetricsService: UsageMetricsService,
   ) {}
 
   async handleStripeNotification(rawRequestBody: Buffer, signature: string) {
@@ -105,23 +109,51 @@ export class BillingService {
     );
 
     const payment = await this.paymentService.getPaymentByMerchantTransactionId(merchantTransactionId);
-
     if (!payment) {
       throw new BadRequestException(`No payment found with id ${merchantTransactionId}`);
     }
     await this.paymentService.updatePayment(payment._id.toString(), { status: 'SUCCESS' });
 
-    // todo get plan and validate status
-    this.logger.info(`Activating plan: ${payment.planId}`);
+    const org = await this.organizationService.getOrganization(payment.organizationId);
+    const orgId = org._id.toString();
+    const planIdToActivate = payment.planId;
 
-    const plan = await this.planService.activatePlan(payment.organizationId, payment.planId);
+    // todo get plan and validate status
+    const planToActivate = await this.planService.getActivePlanForOrganization(planIdToActivate);
+    const activePlan = await this.planService.getActivePlanForOrganization(orgId);
+    if (activePlan) {
+      await this.upgradeExistingPlanAndMetrics(activePlan, planToActivate);
+      await this.activateNewPlan(orgId, planIdToActivate);
+      await this.topUpAndDilute(org);
+    } else {
+      await this.activateNewPlan(orgId, planIdToActivate);
+      await this.buyPostageStamp(orgId);
+    }
+  }
+
+  private async buyPostageStamp(organizationId: string) {
     const amount = 414720000; // one day
     const depth = 17;
     const batchId = await this.beeService.createPostageBatch(amount.toFixed(0), depth);
-    this.logger.info(`Updateing postback batch of organization ${payment.organizationId} to ${batchId}`);
-    await this.organizationService.update(payment.organizationId, {
+    this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
+    await this.organizationService.update(organizationId, {
       postageBatchId: batchId,
     });
+  }
+
+  private async upgradeExistingPlanAndMetrics(planToUpgrade: Plan, newPlan: Plan) {
+    this.logger.info(`Upgrading plan ${planToUpgrade._id}`);
+    await this.planService.updatePlan(planToUpgrade._id.toString(), {
+      status: 'CANCELLED',
+      statusReason: `UPGRADED_TO: ${newPlan._id}`,
+    });
+    await this.usageMetricsService.upgrade(planToUpgrade.organizationId, newPlan.quotas);
+  }
+
+  private async activateNewPlan(organizationId: string, planId: string) {
+    this.logger.info(`Activating plan: ${planId}`);
+    const plan = await this.planService.activatePlan(organizationId, planId);
+    await this.usageMetricsService.upgrade(organizationId, plan.quotas);
   }
 
   private async handleInvoicePaid(object: Stripe.Invoice) {
@@ -136,6 +168,7 @@ export class BillingService {
     } else {
       // recurring payment, there must be already one
       // todo check if client ref id is passed for recurring transactions
+      // todo swarm topup
       const payment = await this.paymentService.getPaymentByMerchantTransactionId(merchantTransactionId);
       this.logger.debug(`Creating successful payment for plan: ${payment.planId}`);
 
@@ -181,5 +214,21 @@ export class BillingService {
     //   organizationId: plan.organizationId,
     //   status: 'SUCCESS',
     // });
+  }
+
+  async cancelPlan(org: Organization) {
+    this.logger.info(`Cancelling plan for organization ${org._id}.`);
+    const plan = await this.planService.cancelActivePlan(org._id.toString());
+    this.logger.info(`Removing postageBatchId ${org.postageBatchId} from organization ${org._id}.`);
+    await this.organizationService.update(org._id.toString(), { postageBatchId: null });
+    await this.usageMetricsService.resetCurrentMetrics(org._id.toString());
+    // todo cancel stripe subscription
+  }
+
+  private async topUpAndDilute(org: Organization) {
+    const amount = 414720000; // one day
+    const depth = 17;
+    await this.beeService.topUp(org.postageBatchId, amount.toFixed(0));
+    await this.beeService.dilute(org.postageBatchId, depth);
   }
 }

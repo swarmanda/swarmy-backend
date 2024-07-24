@@ -12,7 +12,7 @@ const BEE_MIN_CHUNK_SIZE = 4000;
 @Injectable()
 export class UploadService {
   constructor(
-    private uploadMetricsService: UsageMetricsService,
+    private usageMetricsService: UsageMetricsService,
     private fileReferenceService: FileReferenceService,
     private beeService: BeeService,
   ) {}
@@ -28,7 +28,7 @@ export class UploadService {
 
     const size = this.roundUp(file.size, BEE_MIN_CHUNK_SIZE);
     await this.fileReferenceService.createFileReference(result.reference, organization, file, user);
-    await this.uploadMetricsService.increment(organization, 'UPLOADED_BYTES', size, 'LIFETIME');
+    await this.usageMetricsService.increment(organization._id.toString(), 'UPLOADED_BYTES', size, 'LIFETIME');
     return { url: result.reference };
   }
 
