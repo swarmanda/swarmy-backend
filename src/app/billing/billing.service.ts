@@ -19,7 +19,7 @@ export class BillingService {
     @InjectPinoLogger(BillingService.name)
     private readonly logger: PinoLogger,
     private planService: PlanService,
-    private paymentProviderService: StripeService,
+    private stripeService: StripeService,
     private paymentService: PaymentService,
     private beeService: BeeService,
     private organizationService: OrganizationService,
@@ -28,7 +28,7 @@ export class BillingService {
 
   async handleStripeNotification(rawRequestBody: Buffer, signature: string) {
     // const merchantTransactionId = notification['merchantTransactionId'];
-    const event = await this.paymentProviderService.handleNotification(rawRequestBody, signature);
+    const event = await this.stripeService.handleNotification(rawRequestBody, signature);
 
     // const object = event.data.object as any;
     // this.logger.debug(`Received stripe event ${event.type}`);
@@ -89,7 +89,7 @@ export class BillingService {
     });
 
     this.logger.info(`Initializing payment. User: ${user._id} Amount: ${plan.amount} ${plan.currency}`);
-    const result = this.paymentProviderService.initPayment(
+    const result = this.stripeService.initPayment(
       user.organizationId,
       plan._id.toString(),
       user._id.toString(),

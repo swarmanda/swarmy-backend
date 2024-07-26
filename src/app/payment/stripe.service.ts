@@ -13,6 +13,7 @@ export class StripeService {
   private stripeClient: Stripe;
   private readonly frontendUrl: string;
   private readonly webhookSecret: string;
+  private readonly productId: string;
 
   constructor(
     configService: ConfigService,
@@ -22,6 +23,7 @@ export class StripeService {
   ) {
     this.frontendUrl = configService.get<string>('FRONTEND_URL');
     this.webhookSecret = configService.get<string>('STRIPE_WEBHOOK_SECRET');
+    this.productId = configService.get<string>('STRIPE_PRODUCT_ID');
     const apiKey = configService.get<string>('STRIPE_API_KEY');
     this.stripeClient = new Stripe(apiKey);
   }
@@ -53,7 +55,7 @@ export class StripeService {
           price_data: {
             unit_amount: amount,
             currency: currency,
-            product: 'prod_QRFNjsyWt27GoU',
+            product: this.productId,
             recurring: {
               interval: 'month',
             },
@@ -67,8 +69,8 @@ export class StripeService {
         },
       },
       mode: 'subscription',
-      success_url: `${this.frontendUrl}/payment-result?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.frontendUrl}/payment-result?canceled=true`,
+      success_url: `${this.frontendUrl}/app/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${this.frontendUrl}/app/billing?canceled=true`,
     });
 
     return {
