@@ -127,22 +127,25 @@ export class BillingService {
       await this.topUpAndDilute(org);
     } else {
       const plan = await this.activateNewPlan(orgId, planIdToActivate);
-      this.buyPostageStamp(orgId, plan);
+      this.tryBuyPostageStamp(orgId, plan);
     }
   }
 
-  private async buyPostageStamp(organizationId: string, plan: Plan) {
-    const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-    const exp = Math.log2(requestedGbs)
-    const diff = exp + 1;
-    const amount = 414720000; // one day
-
-    const depth = 17 + diff; //min 17, 17 is 512MB
-    const batchId = await this.beeService.createPostageBatch(amount.toFixed(0), depth);
-    this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
-    await this.organizationService.update(organizationId, {
-      postageBatchId: batchId,
-    });
+  private async tryBuyPostageStamp(organizationId: string, plan: Plan) {
+    try {
+      const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
+      const exp = Math.log2(requestedGbs);
+      const diff = exp + 1;
+      const amount = 414720000; // one day
+      const depth = 17 + diff; //min 17, 17 is 512MB
+      const batchId = await this.beeService.createPostageBatch(amount.toFixed(0), depth);
+      this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
+      await this.organizationService.update(organizationId, {
+        postageBatchId: batchId,
+      });
+    } catch (e) {
+      this.logger.error(`Failed to buy postage batch for organization ${organizationId}`, e);
+    }
   }
 
   private async upgradeExistingPlanAndMetrics(planToUpgrade: Plan, newPlan: Plan) {
