@@ -10,28 +10,18 @@ import { BillingModule } from './billing/billing.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { v4 as uuidv4 } from 'uuid';
+import { HealthcheckModule } from './healthcheck/healthcheck.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    // LoggerModule.forRootAsync({
-    //   imports: [ConfigModule],
-    //   inject: [ConfigService],
-    //   useFactory: async (configService: ConfigService) => {
-    //     return {
-    //       pinoHttp: {
-    //         genReqId: true,
-    //         transport: process.env.NODE_ENV !== 'production' ? { target: 'pino-pretty' } : undefined,
-    //       },
-    //     };
-    //   },
-    // }),
     AuthModule,
     UserModule,
     DataModule,
     PlanModule,
     PaymentModule,
     BillingModule,
+    HealthcheckModule,
 
     LoggerModule.forRootAsync({
       imports: [ConfigModule],
