@@ -30,7 +30,7 @@ export class BeeService {
 
   async createPostageBatch(amount: string, depth: number): Promise<BatchId> {
     this.logger.info(`Creating postage batch with amount: ${amount}, depth: ${depth}`);
-    return await this.bee.createPostageBatch(amount, depth);
+    return await this.bee.createPostageBatch(amount, depth, { waitForUsable: true, waitForUsableTimeout: 480_000 });
   }
 
   async dilute(postageBatchId: string, depth: number) {

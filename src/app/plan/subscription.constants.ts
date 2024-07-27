@@ -4,6 +4,9 @@ export const subscriptionConfig = {
     pricePerGb: 0.2,
     defaultOption: 6,
     options: [
+      { size: 1, exp: 0, label: '1 GB' },
+      { size: 2, exp: 1, label: '2 GB' },
+      { size: 4, exp: 2, label: '4 GB' },
       { size: 8, exp: 3, label: '8 GB' },
       { size: 16, exp: 4, label: '16 GB' },
       { size: 32, exp: 5, label: '32 GB' },
@@ -18,6 +21,9 @@ export const subscriptionConfig = {
     pricePerGb: 0.1,
     defaultOption: 6,
     options: [
+      { size: 1, exp: 0, label: '1 GB' },
+      { size: 2, exp: 1, label: '2 GB' },
+      { size: 4, exp: 2, label: '4 GB' },
       { size: 8, exp: 3, label: '8 GB' },
       { size: 16, exp: 4, label: '16 GB' },
       { size: 32, exp: 5, label: '32 GB' },

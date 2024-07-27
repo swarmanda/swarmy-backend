@@ -126,14 +126,18 @@ export class BillingService {
       await this.activateNewPlan(orgId, planIdToActivate);
       await this.topUpAndDilute(org);
     } else {
-      await this.activateNewPlan(orgId, planIdToActivate);
-      await this.buyPostageStamp(orgId);
+      const plan = await this.activateNewPlan(orgId, planIdToActivate);
+      this.buyPostageStamp(orgId, plan);
     }
   }
 
-  private async buyPostageStamp(organizationId: string) {
+  private async buyPostageStamp(organizationId: string, plan: Plan) {
+    const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
+    const exp = Math.log2(requestedGbs)
+    const diff = exp + 1;
     const amount = 414720000; // one day
-    const depth = 17;
+
+    const depth = 17 + diff; //min 17, 17 is 512MB
     const batchId = await this.beeService.createPostageBatch(amount.toFixed(0), depth);
     this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
     await this.organizationService.update(organizationId, {
@@ -154,6 +158,7 @@ export class BillingService {
     this.logger.info(`Activating plan: ${planId}`);
     const plan = await this.planService.activatePlan(organizationId, planId);
     await this.usageMetricsService.upgrade(organizationId, plan.quotas);
+    return plan;
   }
 
   private async handleInvoicePaid(object: Stripe.Invoice) {
