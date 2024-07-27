@@ -144,7 +144,7 @@ export class BillingService {
         postageBatchId: batchId,
       });
     } catch (e) {
-      this.logger.error(`Failed to buy postage batch for organization ${organizationId}`, e);
+      this.logger.error(e, `Failed to buy postage batch for organization ${organizationId}`);
     }
   }
 
