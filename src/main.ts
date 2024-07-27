@@ -10,7 +10,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
   app.useGlobalInterceptors(new LoggerErrorInterceptor());
   app.enableCors(); // todo
-  await app.listen(3000);
+  await app.listen(4000);
 }
 
 bootstrap();
