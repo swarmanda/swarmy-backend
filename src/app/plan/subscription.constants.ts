@@ -4,7 +4,7 @@ export const subscriptionConfig = {
     pricePerGb: 0.2,
     defaultOption: 6,
     options: [
-      // { size: 1, exp: 0, label: '1 GB' },
+      { size: 1, exp: 0, label: '1 GB' },
       { size: 2, exp: 1, label: '2 GB' },
       { size: 4, exp: 2, label: '4 GB' },
       { size: 8, exp: 3, label: '8 GB' },
