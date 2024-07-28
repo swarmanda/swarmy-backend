@@ -7,7 +7,7 @@ import { BeeService } from '../bee/bee.service';
 import { Readable } from 'stream';
 import { Organization } from '../organization/organization.schema';
 
-const BEE_MIN_CHUNK_SIZE = 4000;
+const BEE_MIN_CHUNK_SIZE = 8000; // chunk + metadata 4K each
 
 @Injectable()
 export class UploadService {
