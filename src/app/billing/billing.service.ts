@@ -135,7 +135,7 @@ export class BillingService {
     try {
       const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
       const exp = Math.log2(requestedGbs);
-      const diff = exp + 1;
+      const diff = exp + 1; // todo 2
       const amount = 414720000; // one day
       const depth = 17 + diff; //min 17, 17 is 512MB
       const batchId = await this.beeService.createPostageBatch(amount.toFixed(0), depth);
