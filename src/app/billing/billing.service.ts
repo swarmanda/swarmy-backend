@@ -118,33 +118,21 @@ export class BillingService {
     const orgId = org._id.toString();
     const planIdToActivate = payment.planId;
 
-    // todo get plan and validate status
-    const planToActivate = await this.planService.getActivePlanForOrganization(planIdToActivate);
+    // todo validate status
+    const planToActivate = await this.planService.getPlanById(orgId, planIdToActivate);
+    if (planToActivate.status !== 'PENDING_PAYMENT') {
+      this.logger.error(
+        `Status of plan to activate must be PENDING_PAYMENT, but it's ${planToActivate.status}. Plan: ${planIdToActivate}`,
+      );
+    }
     const activePlan = await this.planService.getActivePlanForOrganization(orgId);
     if (activePlan) {
       await this.upgradeExistingPlanAndMetrics(activePlan, planToActivate);
-      await this.activateNewPlan(orgId, planIdToActivate);
-      await this.topUpAndDilute(org);
+      const newPlan = await this.activateNewPlan(orgId, planIdToActivate);
+      this.tryTopUpAndDilute(org, newPlan);
     } else {
       const plan = await this.activateNewPlan(orgId, planIdToActivate);
-      this.tryBuyPostageStamp(orgId, plan);
-    }
-  }
-
-  private async tryBuyPostageStamp(organizationId: string, plan: Plan) {
-    try {
-      const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-      const exp = Math.log2(requestedGbs);
-      const diff = exp + 1; // todo 2
-      const amount = 414720000; // one day
-      const depth = 17 + diff; //min 17, 17 is 512MB
-      const batchId = await this.beeService.createPostageBatch(amount.toFixed(0), depth);
-      this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
-      await this.organizationService.update(organizationId, {
-        postageBatchId: batchId,
-      });
-    } catch (e) {
-      this.logger.error(e, `Failed to buy postage batch for organization ${organizationId}`);
+      this.tryBuyPostageBatch(orgId, plan);
     }
   }
 
@@ -233,10 +221,34 @@ export class BillingService {
     // todo cancel stripe subscription
   }
 
-  private async topUpAndDilute(org: Organization) {
-    const amount = 414720000; // one day
-    const depth = 17;
-    await this.beeService.topUp(org.postageBatchId, amount.toFixed(0));
-    await this.beeService.dilute(org.postageBatchId, depth);
+  private async tryBuyPostageBatch(organizationId: string, plan: Plan) {
+    try {
+      const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
+      const exp = Math.log2(requestedGbs);
+      const diff = exp + 1; // todo 2
+      const amount = 414720000; // one day
+      const depth = 17 + diff; //min 17, 17 is 512MB
+      const batchId = await this.beeService.createPostageBatch(amount.toFixed(0), depth);
+      this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
+      await this.organizationService.update(organizationId, {
+        postageBatchId: batchId,
+      });
+    } catch (e) {
+      this.logger.error(e, `Failed to buy postage batch for organization ${organizationId}`);
+    }
+  }
+
+  private async tryTopUpAndDilute(org: Organization, plan: Plan) {
+    try {
+      const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
+      const exp = Math.log2(requestedGbs);
+      const diff = exp + 1; // todo 2
+      const amount = 414720000; // one day
+      const depth = 17 + diff; //min 17, 17 is 512MB
+      await this.beeService.topUp(org.postageBatchId, amount.toFixed(0));
+      await this.beeService.dilute(org.postageBatchId, depth);
+    } catch (e) {
+      this.logger.error(e, `TopUp and dilute operation failed. ${org._id}`);
+    }
   }
 }

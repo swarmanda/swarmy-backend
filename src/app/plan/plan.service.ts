@@ -46,4 +46,11 @@ export class PlanService {
   async updatePlan(_id: string, update: Partial<Plan>): Promise<Plan> {
     return (await this.planModel.findOneAndUpdate({ _id }, update)) as Plan;
   }
+
+  async getPlanById(organizationId: string, planId: string) {
+    return (await this.planModel.findOne({
+      organizationId,
+      _id: planId,
+    })) as Plan;
+  }
 }
