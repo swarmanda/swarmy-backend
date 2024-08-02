@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadResultDto } from './upload.result.dto';
@@ -30,8 +30,10 @@ export class DataController {
     @OrganizationInContext() org: Organization,
     @UserInContext() user: User,
     @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
   ): UploadResultDto {
-    return this.uploadService.uploadFile(org, file, user);
+    console.log(body);
+    return this.uploadService.uploadFile(org, file, body.website, user);
   }
 
   @Public()
@@ -41,7 +43,9 @@ export class DataController {
   uploadFileApi(
     @OrganizationInContext() org: Organization,
     @UploadedFile() file: Express.Multer.File,
+    @Body() body: unknown,
   ): UploadResultDto {
+    console.log(body);
     return this.uploadService.uploadFile(org, file);
   }
 

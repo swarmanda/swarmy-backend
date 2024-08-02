@@ -17,9 +17,22 @@ export class UploadService {
     private beeService: BeeService,
   ) {}
 
-  async uploadFile(organization: Organization, file: Express.Multer.File, user?: User): Promise<UploadResultDto> {
+  async uploadFile(
+    organization: Organization,
+    file: Express.Multer.File,
+    uploadAsWebsite?: boolean,
+    user?: User,
+  ): Promise<UploadResultDto> {
     const stream = Readable.from(file.buffer);
-    const result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname);
+    let result;
+    if (uploadAsWebsite) {
+      if (file.mimetype !== 'application/x-tar') {
+        throw new BadRequestException('Not a .tar file');
+      }
+      result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname);
+    } else {
+      result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname);
+    }
 
     const fileRef = await this.fileReferenceService.getFileReference(organization, result.reference);
     if (fileRef) {

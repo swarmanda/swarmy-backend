@@ -1,9 +1,9 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { PlanService } from './plan.service';
 import { Public } from '../auth/public.decorator';
 import { UserInContext } from '../user/user.decorator';
 import { User } from '../user/user.schema';
-import { subscriptionConfig } from './subscription.constants';
+import { subscriptionConfig } from './subscriptions';
 
 @Controller('plans')
 export class PlanController {

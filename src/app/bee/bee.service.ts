@@ -20,8 +20,21 @@ export class BeeService {
     return await this.bee.downloadFile(hash);
   }
 
-  async upload(postageBatchId: string, data: Readable, fileName: string) {
-    return await this.bee.uploadFile(postageBatchId, data, fileName);
+  async upload(postageBatchId: string, data: Readable, fileName: string, uploadAsWebsite?: boolean) {
+    const headers = uploadAsWebsite && {
+      'Swarm-Index-Document': 'index.html',
+      'Swarm-Collection': 'true',
+    };
+
+    return await this.bee.uploadFile(
+      postageBatchId,
+      data,
+      fileName,
+      {},
+      {
+        headers,
+      },
+    );
   }
 
   async getAllPostageBatches() {
@@ -29,7 +42,6 @@ export class BeeService {
   }
 
   async createPostageBatch(amount: string, depth: number): Promise<BatchId> {
-    this.logger.info(`Creating postage batch with amount: ${amount}, depth: ${depth}`);
     return await this.bee.createPostageBatch(amount, depth, { waitForUsable: true, waitForUsableTimeout: 480_000 });
   }
 
@@ -39,7 +51,6 @@ export class BeeService {
   }
 
   async topUp(postageBatchId: string, amount: string) {
-    this.logger.info(`Performing topUp on ${postageBatchId} with amount: ${amount}`);
     return await this.bee.topUpBatch(postageBatchId, amount);
   }
 }

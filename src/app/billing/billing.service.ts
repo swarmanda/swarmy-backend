@@ -8,7 +8,7 @@ import { PaymentService } from '../payment/payment.service';
 import Stripe from 'stripe';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { StartSubscriptionDto } from './start-subscription.dto';
-import { subscriptionConfig } from '../plan/subscription.constants';
+import { calculateDepthAndAmount, subscriptionConfig } from '../plan/subscriptions';
 import { UsageMetricsService } from '../data/usage-metrics.service';
 import { Plan } from '../plan/plan.schema';
 import { Organization } from '../organization/organization.schema';
@@ -129,10 +129,10 @@ export class BillingService {
     if (activePlan) {
       await this.upgradeExistingPlanAndMetrics(activePlan, planToActivate);
       const newPlan = await this.activateNewPlan(orgId, planIdToActivate);
-      this.tryTopUpAndDilute(org, newPlan);
+      this.topUpAndDilute(org, newPlan);
     } else {
       const plan = await this.activateNewPlan(orgId, planIdToActivate);
-      this.tryBuyPostageBatch(orgId, plan);
+      this.buyPostageBatch(org, plan);
     }
   }
 
@@ -221,34 +221,51 @@ export class BillingService {
     // todo cancel stripe subscription
   }
 
-  private async tryBuyPostageBatch(organizationId: string, plan: Plan) {
+  private async buyPostageBatch(org: Organization, plan: Plan) {
+    const organizationId = org._id.toString();
+    await this.organizationService.update(organizationId, { postageBatchStatus: 'CREATING' });
     try {
       const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-      const exp = Math.log2(requestedGbs);
-      const diff = exp + 1; // todo 2
-      const amount = 414720000; // one day
-      const depth = 17 + diff; //min 17, 17 is 512MB
-      const batchId = await this.beeService.createPostageBatch(amount.toFixed(0), depth);
+      const days = org.config.topUpDays || 31;
+      const config = calculateDepthAndAmount(days, requestedGbs);
+      this.logger.info(
+        `Creating postage batch. Amount: ${config.amount}, depth: ${config.depth}, cost: BZZ ${config.bzzPrice}`,
+      );
+      const batchId = await this.beeService.createPostageBatch(config.amount.toFixed(0), config.depth);
       this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
       await this.organizationService.update(organizationId, {
         postageBatchId: batchId,
+        postageBatchStatus: 'CREATED',
       });
     } catch (e) {
       this.logger.error(e, `Failed to buy postage batch for organization ${organizationId}`);
+      await this.organizationService.update(organizationId, { postageBatchStatus: 'FAILED_TO_CREATE' });
     }
   }
 
-  private async tryTopUpAndDilute(org: Organization, plan: Plan) {
+  private async topUpAndDilute(org: Organization, plan: Plan) {
+    //todo calculate minimum required top up amount
+    //todo check if dilute is needed
+    //todo store amount and depth?
+
+    const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
+    const days = org?.config?.topUpDays || 31;
+    const config = calculateDepthAndAmount(days, requestedGbs);
+    // todo dev mode set fix depth
+    const amount = config.amount.toFixed(0);
     try {
-      const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-      const exp = Math.log2(requestedGbs);
-      const diff = exp + 1; // todo 2
-      const amount = 414720000; // one day
-      const depth = 17 + diff; //min 17, 17 is 512MB
-      await this.beeService.topUp(org.postageBatchId, amount.toFixed(0));
-      await this.beeService.dilute(org.postageBatchId, depth);
+      this.logger.info(`Performing topUp on ${org.postageBatchId} with amount: ${amount}. (days: ${days})`);
+      await this.beeService.topUp(org.postageBatchId, amount);
     } catch (e) {
-      this.logger.error(e, `TopUp and dilute operation failed. ${org._id}`);
+      this.logger.error(e, `TopUp operation failed. Skipping diluting. Org: ${org._id}`);
+      await this.organizationService.update(org._id.toString(), { postageBatchStatus: 'FAILED_TO_TOP_UP' });
+      return;
+    }
+    try {
+      await this.beeService.dilute(org.postageBatchId, config.depth);
+    } catch (e) {
+      this.logger.error(e, `Dilute operation failed. Org: ${org._id}`);
+      await this.organizationService.update(org._id.toString(), { postageBatchStatus: 'FAILED_TO_DILUTE' });
     }
   }
 }
