@@ -29,7 +29,7 @@ export class UploadService {
       if (file.mimetype !== 'application/x-tar') {
         throw new BadRequestException('Not a .tar file');
       }
-      result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname);
+      result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname, true);
     } else {
       result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname);
     }
