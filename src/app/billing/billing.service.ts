@@ -226,7 +226,7 @@ export class BillingService {
     await this.organizationService.update(organizationId, { postageBatchStatus: 'CREATING' });
     try {
       const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-      const days = org.config.topUpDays || 31;
+      const days = org?.config?.topUpDays ?? 31;
       const config = calculateDepthAndAmount(days, requestedGbs);
       this.logger.info(
         `Creating postage batch. Amount: ${config.amount}, depth: ${config.depth}, cost: BZZ ${config.bzzPrice}`,
@@ -249,7 +249,7 @@ export class BillingService {
     //todo store amount and depth?
 
     const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-    const days = org?.config?.topUpDays || 31;
+    const days = org?.config?.topUpDays ?? 31;
     const config = calculateDepthAndAmount(days, requestedGbs);
     // todo dev mode set fix depth
     const amount = config.amount.toFixed(0);
