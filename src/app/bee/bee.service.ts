@@ -1,4 +1,4 @@
-import { BatchId, Bee, Data, FileData } from '@ethersphere/bee-js';
+import { BatchId, Bee, BeeError, Data, FileData } from '@ethersphere/bee-js';
 import { Injectable } from '@nestjs/common';
 import { Readable } from 'stream';
 import { ConfigService } from '@nestjs/config';
@@ -21,20 +21,18 @@ export class BeeService {
   }
 
   async upload(postageBatchId: string, data: Readable, fileName: string, uploadAsWebsite?: boolean) {
-    const headers = uploadAsWebsite && {
-      'Swarm-Index-Document': 'index.html',
-      'Swarm-Collection': 'true',
-    };
-
-    return await this.bee.uploadFile(
-      postageBatchId,
-      data,
-      fileName,
-      {},
-      {
-        headers,
+    const requestOptions = uploadAsWebsite && {
+      headers: {
+        'Swarm-Index-Document': 'index.html',
+        'Swarm-Collection': 'true',
       },
-    );
+    };
+    const options = uploadAsWebsite && { contentType: 'application/x-tar' };
+    try {
+      return await this.bee.uploadFile(postageBatchId, data, fileName, options, requestOptions);
+    } catch (e: any) {
+      this.logger.error(e, 'Failed to upload');
+    }
   }
 
   async getAllPostageBatches() {
