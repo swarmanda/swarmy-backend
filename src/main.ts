@@ -9,7 +9,7 @@ async function bootstrap() {
   });
   app.useLogger(app.get(Logger));
   app.useGlobalInterceptors(new LoggerErrorInterceptor());
-  // app.enableCors(); // todo
+  app.enableCors(); // todo
   await app.listen(4000);
 }
 
