@@ -18,6 +18,7 @@ export class FileReferenceService {
     hash: string,
     organization: Organization,
     file: Express.Multer.File,
+    isWebsite: boolean,
     user?: User,
   ): Promise<UploadResultDto> {
     return await new this.fileReferenceModel({
@@ -28,6 +29,7 @@ export class FileReferenceService {
       name: file.originalname,
       contentType: file.mimetype.split(';')[0],
       thumbnailBase64: await this.createThumbnail(file),
+      isWebsite,
     }).save();
   }
 

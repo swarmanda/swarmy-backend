@@ -13,19 +13,21 @@ export class DownloadService {
     private beeService: BeeService,
   ) {}
 
-  async download(org: Organization, hash: string): Promise<DownloadResult> {
+  async download(org: Organization, hash: string, path?: string): Promise<DownloadResult> {
     const fileRef = await this.fileReferenceService.getFileReference(org, hash);
     if (!fileRef) {
       throw new NotFoundException();
     }
-    const result = await this.beeService.download(hash);
+    const result = await this.beeService.download(hash, path);
 
     this.usageMetricsService.increment(org._id.toString(), 'DOWNLOADED_BYTES', fileRef.size).catch((e) => {
       console.error('Failed to handle download event', e);
     });
 
     return {
-      contentType: fileRef.contentType,
+      headers: {
+        'Content-Type': fileRef.isWebsite ? result.contentType : fileRef.contentType,
+      },
       data: result.data,
     };
   }

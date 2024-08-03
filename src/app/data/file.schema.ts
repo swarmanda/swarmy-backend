@@ -30,6 +30,9 @@ export class FileReference {
 
   @Prop({ default: 0 })
   hits: number;
+
+  @Prop({ default: false })
+  isWebsite: boolean;
 }
 
 export const FileReferenceSchema = SchemaFactory.createForClass(FileReference);

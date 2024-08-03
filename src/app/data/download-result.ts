@@ -1,4 +1,4 @@
 export interface DownloadResult {
-  contentType: string;
+  headers: Record<string, string>;
   data: Uint8Array;
 }

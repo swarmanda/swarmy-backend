@@ -40,7 +40,7 @@ export class UploadService {
     }
 
     const size = this.roundUp(file.size, BEE_MIN_CHUNK_SIZE);
-    await this.fileReferenceService.createFileReference(result.reference, organization, file, user);
+    await this.fileReferenceService.createFileReference(result.reference, organization, file, uploadAsWebsite, user);
     await this.usageMetricsService.increment(organization._id.toString(), 'UPLOADED_BYTES', size, 'LIFETIME');
     return { url: result.reference };
   }

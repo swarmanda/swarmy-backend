@@ -1,4 +1,4 @@
-import { BatchId, Bee, BeeError, Data, FileData } from '@ethersphere/bee-js';
+import { BatchId, Bee, Data, FileData } from '@ethersphere/bee-js';
 import { Injectable } from '@nestjs/common';
 import { Readable } from 'stream';
 import { ConfigService } from '@nestjs/config';
@@ -16,8 +16,8 @@ export class BeeService {
     this.bee = new Bee(configService.get<string>('BEE_URL'));
   }
 
-  async download(hash: string): Promise<FileData<Data>> {
-    return await this.bee.downloadFile(hash);
+  async download(hash: string, path?: string): Promise<FileData<Data>> {
+    return await this.bee.downloadFile(hash, path);
   }
 
   async upload(postageBatchId: string, data: Readable, fileName: string, uploadAsWebsite?: boolean) {
@@ -28,11 +28,7 @@ export class BeeService {
       },
     };
     const options = uploadAsWebsite && { contentType: 'application/x-tar' };
-    try {
-      return await this.bee.uploadFile(postageBatchId, data, fileName, options, requestOptions);
-    } catch (e: any) {
-      this.logger.error(e, 'Failed to upload');
-    }
+    return await this.bee.uploadFile(postageBatchId, data, fileName, options, requestOptions);
   }
 
   async getAllPostageBatches() {

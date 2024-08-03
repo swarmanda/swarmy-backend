@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadResultDto } from './upload.result.dto';
@@ -10,7 +22,7 @@ import { DownloadService } from './download.service';
 import { ApiKeyGuard } from '../api-key/api-key.guard';
 import { Public } from '../auth/public.decorator';
 import { UsageMetricsService } from './usage-metrics.service';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { Buffer } from 'safe-buffer';
 import { OrganizationInContext } from '../organization/organization.decorator';
 import { Organization } from '../organization/organization.schema';
@@ -71,10 +83,35 @@ export class DataController {
     @OrganizationInContext() org: Organization,
     @Param('hash') hash: string,
     @Res() response: Response,
+    @Req() request: Request,
   ) {
     try {
       const result = await this.downloadService.download(org, hash);
-      return response.status(200).contentType(result.contentType).send(Buffer.from(result.data.buffer));
+      for (const key in result.headers) {
+        response.header(key, result.headers[key]);
+      }
+      return response.status(200).cookie('k', request['key']).send(Buffer.from(result.data.buffer));
+    } catch (error) {
+      return response.status(404).json({ message: 'not found' });
+    }
+  }
+
+  @Public()
+  @UseGuards(ApiKeyGuard)
+  @Get('files/:hash/*')
+  async downloadEmbeddedFile(
+    @OrganizationInContext() org: Organization,
+    @Param('hash') hash: string,
+    @Res() response: Response,
+    @Req() request: Request,
+  ) {
+    try {
+      const path = request.path.split(hash)[1];
+      const result = await this.downloadService.download(org, hash, path);
+      for (const key in result.headers) {
+        response.header(key, result.headers[key]);
+      }
+      return response.status(200).send(Buffer.from(result.data.buffer));
     } catch (error) {
       return response.status(404).json({ message: 'not found' });
     }

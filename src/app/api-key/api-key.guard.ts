@@ -13,19 +13,22 @@ export class ApiKeyGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    const token = this.extractTokenFromHeader(request) || request.query['k'];
+    const token = request.query['k'] || this.extractTokenFromHeader(request) || this.extractTokenFromCookies(request);
     if (!token) {
       throw new UnauthorizedException();
     }
     let apiKey = null;
     try {
       apiKey = await this.apiKeyService.getApiKeyBySecret(token);
-      request['organization'] = await this.organizationService.getOrganization(apiKey.organizationId);
+      if (apiKey.status === 'ACTIVE') {
+        request['organization'] = await this.organizationService.getOrganization(apiKey.organizationId);
+        request['key'] = token;
+      }
     } catch (e) {
       console.error('Failed to verify API key', e);
       throw new UnauthorizedException('Failed to verify API key');
     }
-    if (!apiKey) {
+    if (!apiKey || apiKey.status !== 'ACTIVE') {
       throw new UnauthorizedException('API key is invalid');
     }
     return true;
@@ -34,5 +37,11 @@ export class ApiKeyGuard implements CanActivate {
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     return type === 'Bearer' ? token : undefined;
+  }
+
+  private extractTokenFromCookies(request: Request): string | undefined {
+    if (request.cookies && request.cookies['k']) {
+      return request.cookies['k'];
+    }
   }
 }
