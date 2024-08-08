@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { FilterQuery, Model } from 'mongoose';
 import { UsageMetrics, UsageMetricType } from './usage-metrics.schema';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { PlanService } from '../plan/plan.service';
@@ -70,7 +70,19 @@ export class UsageMetricsService {
     )) as UsageMetrics;
   }
 
-  async getForOrganization(organizationId: string) {
+  async getForOrganization(organizationId: string, type?: UsageMetricType): Promise<UsageMetrics> {
+    //todo get active plan
+    const filter: FilterQuery<UsageMetrics> = {
+      organizationId,
+      period: { $in: [this.getCurrentPeriod(), LIFETIME_PERIOD] },
+    };
+    if (type) {
+      filter.type = type;
+    }
+    return (await this.usageMetricsModel.findOne(filter)) as UsageMetrics;
+  }
+
+  async getAllForOrganization(organizationId: string): Promise<UsageMetrics[]> {
     //todo get active plan
     return (await this.usageMetricsModel.find({
       organizationId,

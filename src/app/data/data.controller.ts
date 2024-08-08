@@ -32,7 +32,6 @@ export class DataController {
     @UploadedFile() file: Express.Multer.File,
     @Body() body: any,
   ): UploadResultDto {
-    console.log(body);
     return this.uploadService.uploadFile(org, file, body.website, user);
   }
 
@@ -112,6 +111,6 @@ export class DataController {
 
   @Get('usage-metrics')
   getUsageMetricsForOrganization(@UserInContext() user: User) {
-    return this.usageMetricsService.getForOrganization(user.organizationId);
+    return this.usageMetricsService.getAllForOrganization(user.organizationId);
   }
 }

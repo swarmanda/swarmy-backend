@@ -11,6 +11,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { v4 as uuidv4 } from 'uuid';
 import { HealthcheckModule } from './healthcheck/healthcheck.module';
+import { StaticTextModule } from './static-text/static-text.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { HealthcheckModule } from './healthcheck/healthcheck.module';
     PaymentModule,
     BillingModule,
     HealthcheckModule,
+    StaticTextModule,
 
     LoggerModule.forRootAsync({
       imports: [ConfigModule],

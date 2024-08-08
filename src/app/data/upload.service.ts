@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { UploadResultDto } from './upload.result.dto';
 import { User } from '../user/user.schema';
 import { UsageMetricsService } from './usage-metrics.service';
@@ -24,25 +24,40 @@ export class UploadService {
     user?: User,
   ): Promise<UploadResultDto> {
     const stream = Readable.from(file.buffer);
-    let result;
     if (uploadAsWebsite) {
       if (file.mimetype !== 'application/x-tar') {
         throw new BadRequestException('Not a .tar file');
       }
-      result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname, true);
-    } else {
-      result = await this.beeService.upload(organization.postageBatchId, stream, file.originalname);
     }
+    const size = this.roundUp(file.size, BEE_MIN_CHUNK_SIZE);
+    await this.validateUploadLimit(organization, size);
+    const result = await this.beeService.upload(
+      organization.postageBatchId,
+      stream,
+      file.originalname,
+      uploadAsWebsite,
+    );
 
     const fileRef = await this.fileReferenceService.getFileReference(organization, result.reference);
     if (fileRef) {
       throw new BadRequestException(`File already uploaded, reference: ${result.reference}`);
     }
 
-    const size = this.roundUp(file.size, BEE_MIN_CHUNK_SIZE);
     await this.fileReferenceService.createFileReference(result.reference, organization, file, uploadAsWebsite, user);
     await this.usageMetricsService.increment(organization._id.toString(), 'UPLOADED_BYTES', size, 'LIFETIME');
     return { url: result.reference };
+  }
+
+  private async validateUploadLimit(organization: Organization, size: number) {
+    const metrics = await this.usageMetricsService.getForOrganization(organization._id.toString(), 'UPLOADED_BYTES');
+    if (!metrics) {
+      // first upload in current period.
+      return;
+    }
+    const remaining = metrics.available - metrics.used;
+    if (remaining < size) {
+      throw new UnprocessableEntityException(`Upload limit reached.`);
+    }
   }
 
   roundUp(numToRound: number, multiple: number) {
