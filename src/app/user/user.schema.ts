@@ -3,7 +3,7 @@ import mongoose, { HydratedDocument } from 'mongoose';
 
 export type UserDocument = HydratedDocument<User>;
 
-@Schema()
+@Schema({ timestamps: true })
 export class User {
   _id: mongoose.Types.ObjectId;
 
@@ -15,6 +15,12 @@ export class User {
 
   @Prop()
   organizationId: string;
+
+  @Prop()
+  emailVerified: boolean;
+
+  @Prop()
+  emailVerificationCode: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

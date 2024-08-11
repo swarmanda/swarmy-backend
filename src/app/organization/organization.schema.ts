@@ -4,7 +4,7 @@ import { OrganizationConfig } from './organization-config.schema';
 
 export type OrganizationDocument = HydratedDocument<Organization>;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Organization {
   _id: mongoose.Types.ObjectId;
 
@@ -19,6 +19,9 @@ export class Organization {
 
   @Prop({ type: OrganizationConfig })
   config?: OrganizationConfig;
+
+  @Prop()
+  hasEmailVerifiedUser: boolean;
 }
 
 export const OrganizationSchema = SchemaFactory.createForClass(Organization);

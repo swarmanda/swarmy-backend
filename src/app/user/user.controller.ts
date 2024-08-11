@@ -6,6 +6,7 @@ import { UserInContext } from './user.decorator';
 import { User } from './user.schema';
 import { OrganizationInContext } from '../organization/organization.decorator';
 import { Organization } from '../organization/organization.schema';
+import { VerifyEmailDto } from './verify.email.dto';
 
 @Controller('users')
 export class UserController {
@@ -17,6 +18,7 @@ export class UserController {
       email: user.email,
       organizationId: org._id,
       postageBatchStatus: org.postageBatchStatus,
+      emailVerified: user.emailVerified,
     };
   }
 
@@ -24,5 +26,15 @@ export class UserController {
   @Post('/register')
   async register(@Body() registerUserDto: RegisterUserDto) {
     await this.userService.createUser(registerUserDto);
+  }
+
+  @Post('/resend-email-verification')
+  async resendEmailVerification(@UserInContext() user: User) {
+    await this.userService.resendEmailVerification(user);
+  }
+
+  @Post('/verify-email')
+  async verifyEmail(@UserInContext() user: User, @Body() dto: VerifyEmailDto) {
+    await this.userService.verifyEmail(user, dto.code);
   }
 }

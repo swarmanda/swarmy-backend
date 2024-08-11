@@ -12,6 +12,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { v4 as uuidv4 } from 'uuid';
 import { HealthcheckModule } from './healthcheck/healthcheck.module';
 import { StaticTextModule } from './static-text/static-text.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { StaticTextModule } from './static-text/static-text.module';
     BillingModule,
     HealthcheckModule,
     StaticTextModule,
+    EmailModule,
 
     LoggerModule.forRootAsync({
       imports: [ConfigModule],

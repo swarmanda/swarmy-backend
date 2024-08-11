@@ -4,7 +4,7 @@ import { PlanQuota } from './plan-quota.schema';
 
 export type PlanDocument = HydratedDocument<Plan>;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Plan {
   _id: mongoose.Types.ObjectId;
 

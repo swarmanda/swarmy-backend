@@ -3,7 +3,7 @@ import mongoose, { HydratedDocument } from 'mongoose';
 
 export type PaymentNotificationDocument = HydratedDocument<PaymentNotification>;
 
-@Schema()
+@Schema({ timestamps: true })
 export class PaymentNotification {
   _id: mongoose.Types.ObjectId;
 
