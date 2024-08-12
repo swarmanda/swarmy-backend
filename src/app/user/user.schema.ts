@@ -21,6 +21,9 @@ export class User {
 
   @Prop()
   emailVerificationCode: string;
+
+  @Prop()
+  resetPasswordToken: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

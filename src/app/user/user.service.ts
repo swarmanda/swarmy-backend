@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { RegisterUserDto } from './register.user.dto';
+import { RegisterUserDto } from './register-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './user.schema';
 import { Model } from 'mongoose';
@@ -39,7 +39,7 @@ export class UserService {
       password: await this.hash(registerUserDto.password),
       organizationId: organization._id,
       emailVerified: false,
-      emailVerificationCode: this.generateEmailVerificationCode(),
+      emailVerificationCode: this.generateRandomTokenWithTimestamp(),
     }).save();
     this.logger.info('User created: %s', savedUser.email);
 
@@ -66,7 +66,7 @@ export class UserService {
 
     this.verifyEmailVerificationCanBeSent(user);
 
-    const newCode = this.generateEmailVerificationCode();
+    const newCode = this.generateRandomTokenWithTimestamp();
     await this.userModel.findOneAndUpdate(
       { _id: user._id },
       {
@@ -91,17 +91,17 @@ export class UserService {
       throw new BadRequestException();
     }
     this.logger.info(user);
-    const elapsedSeconds = this.getElapsedSeconds(user.emailVerificationCode);
+    const elapsedSeconds = this.getElapsedSeconds(user.resetPasswordToken);
 
     if (elapsedSeconds < 20) {
       this.logger.debug(
-        `Can't send verification email, last code was sent less than 20 seconds ago. ${user.emailVerificationCode}`,
+        `Can't send verification email, last code was sent less than 20 seconds ago. ${user.resetPasswordToken}`,
       );
       throw new BadRequestException();
     }
   }
 
-  private generateEmailVerificationCode() {
+  private generateRandomTokenWithTimestamp() {
     const random = randomStringGenerator();
     const time = Date.now();
     return `${random}-${time}`;
@@ -139,8 +139,8 @@ export class UserService {
     }
   }
 
-  private getElapsedSeconds(emailVerificationCode: string) {
-    const parts = emailVerificationCode.split('-');
+  private getElapsedSeconds(tokenWithTimestamp: string) {
+    const parts = tokenWithTimestamp.split('-');
     if (parts.length !== 2) {
       throw new BadRequestException();
     }
@@ -149,5 +149,51 @@ export class UserService {
       throw new BadRequestException();
     }
     return (Date.now() - timeOfLastCode) / 1000;
+  }
+
+  async sendResetPasswordEmail(email: string) {
+    const user = await this.getUser(email);
+    if (!user) {
+      this.logger.info(`Use does not exist with email ${email}, not sending password reset email.`);
+      return;
+    }
+    if (user.resetPasswordToken) {
+      if (this.getElapsedSeconds(user.resetPasswordToken) < 60) {
+        this.logger.debug(`Reset password token ${this.getElapsedSeconds(user.resetPasswordToken)}`);
+        throw new BadRequestException();
+      }
+    }
+
+    const token = this.generateRandomTokenWithTimestamp();
+    await this.userModel.findOneAndUpdate(
+      { _id: user._id },
+      {
+        resetPasswordToken: token,
+      },
+    );
+
+    const resetUrl = `${this.frontendUrl}/reset-password?token=${token}`;
+    await this.emailService.sendPasswordReset(resetUrl, email);
+  }
+
+  async resetPassword(password: string, token: string) {
+    if (this.getElapsedSeconds(token) > 60 * 60) {
+      throw new BadRequestException();
+    }
+    const user = await this.userModel.findOne({ resetPasswordToken: token });
+
+    if (!user) {
+      this.logger.info(`Can't reset password by token ${token}. User does not exist.`);
+      return;
+    }
+
+    this.logger.info(`Resetting password for user ${user._id}`);
+    await this.userModel.findOneAndUpdate(
+      { _id: user._id },
+      {
+        password: await this.hash(password),
+        resetPasswordToken: null,
+      },
+    );
   }
 }

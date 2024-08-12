@@ -10,8 +10,11 @@ import { ConfigService } from '@nestjs/config';
 export class EmailService {
   private readonly sendGridApiKey: string;
   private readonly verificationTemplateId: string;
-  private readonly fromEmail: string;
-  private readonly fromName: string;
+  private readonly emailVerificationFromEmail: string;
+  private readonly emailVerificationFromName: string;
+  private readonly passwordResetTemplateId: string;
+  private readonly passwordResetFromEmail: string;
+  private readonly passwordResetFromName: string;
 
   constructor(
     configService: ConfigService,
@@ -22,33 +25,55 @@ export class EmailService {
   ) {
     this.sendGridApiKey = configService.get<string>('SENDGRID_API_KEY');
     this.verificationTemplateId = configService.get<string>('EMAIL_VERIFICATION_TEMPLATE_ID');
-    this.fromEmail = configService.get<string>('EMAIL_VERIFICATION_FROM_EMAIL');
-    this.fromName = configService.get<string>('EMAIL_VERIFICATION_FROM_NAME');
+    this.emailVerificationFromEmail = configService.get<string>('EMAIL_VERIFICATION_FROM_EMAIL');
+    this.emailVerificationFromName = configService.get<string>('EMAIL_VERIFICATION_FROM_NAME');
+
+    this.passwordResetTemplateId = configService.get<string>('PASSWORD_RESET_TEMPLATE_ID');
+    this.passwordResetFromEmail = configService.get<string>('PASSWORD_RESET_FROM_EMAIL');
+    this.passwordResetFromName = configService.get<string>('PASSWORD_RESET_FROM_NAME');
+
     mail.setApiKey(this.sendGridApiKey);
   }
 
   async sendEmailVerification(recipient: string, verificationLink: string) {
-    // mail.setClient(new Client());
-    // mail.setApiKey(this.sendGridApiKey);
     const msg = {
       to: recipient,
       from: {
-        email: this.fromEmail,
-        name: this.fromName,
+        email: this.emailVerificationFromEmail,
+        name: this.emailVerificationFromName,
       },
       subject: 'Verify your email',
       templateId: this.verificationTemplateId,
       dynamic_template_data: {
         VERIFICATION_LINK: verificationLink,
       },
-      // dynamicTemplateData: {
-      //   VERIFICATION_LINK: verificationLink,
-      // },
     };
     try {
       this.logger.info('Sending verification email');
       await mail.send(msg);
-      this.logger.info('Email successfully sent');
+      this.logger.info('Email verification email successfully sent');
+    } catch (e) {
+      this.logger.error(e, 'Failed to send email');
+    }
+  }
+
+  async sendPasswordReset(resetUrl: string, recipient: string) {
+    const msg = {
+      to: recipient,
+      from: {
+        email: this.passwordResetFromEmail,
+        name: this.passwordResetFromName,
+      },
+      subject: 'Verify your email',
+      templateId: this.passwordResetTemplateId,
+      dynamic_template_data: {
+        RESET_URL: resetUrl,
+      },
+    };
+    try {
+      this.logger.info('Sending password reset email');
+      await mail.send(msg);
+      this.logger.info('Password reset email successfully sent');
     } catch (e) {
       this.logger.error(e, 'Failed to send email');
     }
