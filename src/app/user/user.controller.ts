@@ -28,13 +28,20 @@ export class UserController {
     await this.userService.createUser(registerUserDto);
   }
 
-  @Post('/resend-email-verification')
-  async resendEmailVerification(@UserInContext() user: User) {
-    await this.userService.resendEmailVerification(user);
+  @Public()
+  @Post('/resend-email-verification-by-code')
+  async resendEmailVerificationByCode(@Body() dto: VerifyEmailDto) {
+    await this.userService.resendEmailVerification(null, dto.code);
   }
 
+  @Post('/resend-email-verification-by-user')
+  async resendEmailVerificationByUser(@UserInContext() user: User) {
+    await this.userService.resendEmailVerification(user, null);
+  }
+
+  @Public()
   @Post('/verify-email')
-  async verifyEmail(@UserInContext() user: User, @Body() dto: VerifyEmailDto) {
-    await this.userService.verifyEmail(user, dto.code);
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    await this.userService.verifyEmail(dto.code);
   }
 }

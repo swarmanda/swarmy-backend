@@ -59,29 +59,45 @@ export class UserService {
     return await bcrypt.hash(password, saltOrRounds);
   }
 
-  async resendEmailVerification(user: User) {
+  async resendEmailVerification(user: User, code: string) {
+    if (!user) {
+      user = await this.userModel.findOne({ emailVerificationCode: code });
+    }
+
     this.verifyEmailVerificationCanBeSent(user);
 
-    const code = this.generateEmailVerificationCode();
+    const newCode = this.generateEmailVerificationCode();
     await this.userModel.findOneAndUpdate(
       { _id: user._id },
       {
-        emailVerificationCode: code,
+        emailVerificationCode: newCode,
       },
     );
-    const verificationUrl = this.getVerificationUrl(code);
+    const verificationUrl = this.getVerificationUrl(newCode);
     await this.emailService.sendEmailVerification(user.email, verificationUrl);
   }
 
   private getVerificationUrl(code: string) {
-    return `${this.frontendUrl}/app/verify?c=${code}`;
+    return `${this.frontendUrl}/verify?c=${code}`;
   }
 
   private verifyEmailVerificationCanBeSent(user: User) {
+    if (!user) {
+      this.logger.debug(`Can't resent email verification code. User does not exist.'`);
+      throw new BadRequestException();
+    }
+    if (user.emailVerified) {
+      this.logger.debug(`User already verified. Can't send email verification code.`);
+      throw new BadRequestException();
+    }
+    this.logger.info(user);
     const elapsedSeconds = this.getElapsedSeconds(user.emailVerificationCode);
 
-    if (elapsedSeconds < 60) {
-      throw new BadRequestException('Too soon');
+    if (elapsedSeconds < 20) {
+      this.logger.debug(
+        `Can't send verification email, last code was sent less than 20 seconds ago. ${user.emailVerificationCode}`,
+      );
+      throw new BadRequestException();
     }
   }
 
@@ -91,14 +107,18 @@ export class UserService {
     return `${random}-${time}`;
   }
 
-  async verifyEmail(user: User, code: string) {
+  async verifyEmail(code: string) {
+    const user = await this.userModel.findOne({ emailVerificationCode: code });
+
+    if (!user) {
+      this.logger.debug(`Can't verify user by code ${code}. User does not exist'`);
+      throw new BadRequestException('');
+    }
     if (user.emailVerified) {
       return;
     }
-    if (user.emailVerificationCode !== code) {
-      throw new BadRequestException();
-    }
-    this.checkVerificationCodeExpiration(user.emailVerificationCode);
+    this.checkVerificationCode(user.emailVerificationCode, code);
+    this.logger.info(`User email verification successful ${code} ${user._id}'`);
     await this.userModel.findOneAndUpdate(
       { _id: user._id },
       {
@@ -107,9 +127,14 @@ export class UserService {
     );
   }
 
-  private checkVerificationCodeExpiration(emailVerificationCode: string) {
+  private checkVerificationCode(emailVerificationCode: string, submittedCode: string) {
+    if (emailVerificationCode !== submittedCode) {
+      this.logger.debug(`Verification codes does not match '${emailVerificationCode}' !== '${submittedCode}'`);
+      throw new BadRequestException();
+    }
     const elapsedSeconds = this.getElapsedSeconds(emailVerificationCode);
     if (elapsedSeconds > 24 * 60 * 60) {
+      this.logger.debug(`Verification code expired ${emailVerificationCode}. Elapsed: ${elapsedSeconds}`);
       throw new BadRequestException('Expired');
     }
   }

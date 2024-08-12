@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { jwtConstants } from './auth.constants';
 import { Request } from 'express';
@@ -6,6 +6,7 @@ import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { UserService } from '../user/user.service';
 import { OrganizationService } from '../organization/organization.service';
+import { User } from '../user/user.schema';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -31,15 +32,23 @@ export class AuthGuard implements CanActivate {
     if (!token) {
       throw new UnauthorizedException();
     }
+    let user: User;
     try {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: jwtConstants.secret,
       });
-      const user = await this.userService.getUser(payload.email);
+      user = await this.userService.getUser(payload.email);
       request['user'] = user;
       request['organization'] = await this.organizationService.getOrganization(user.organizationId);
     } catch {
       throw new UnauthorizedException('Unauthorized');
+    }
+
+    if (!user.emailVerified) {
+      if (['/users/resend-email-verification-by-user', '/users/me'].includes(request.path)) {
+        return true;
+      }
+      throw new ForbiddenException();
     }
     return true;
   }
