@@ -42,6 +42,6 @@ export class Plan {
   // stripeCustomerId: string;
 }
 
-export type PlanStatus = 'PENDING_PAYMENT' | 'ACTIVE' | 'SCHEDULED_FOR_CANCELLATION' | 'CANCELLED';
+export type PlanStatus = 'PENDING_PAYMENT' | 'ACTIVE' | 'CANCELLED';
 
 export const PlanSchema = SchemaFactory.createForClass(Plan);

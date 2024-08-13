@@ -49,7 +49,6 @@ export class PlanService {
   async scheduleActivePlanForCancellation(organizationId: string) {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
     return await this.updatePlan(existingActivePlan._id.toString(), {
-      status: 'SCHEDULED_FOR_CANCELLATION',
       cancelAt: existingActivePlan.paidTill,
     });
   }

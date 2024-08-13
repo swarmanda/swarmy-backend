@@ -6,6 +6,8 @@ import { UsageMetricsService } from '../data/usage-metrics.service';
 import { Interval } from '@nestjs/schedule';
 import { Plan } from '../plan/plan.schema';
 
+const FIVE_MINUTES_IN_MILLIS = 5 * 60 * 1000;
+
 @Injectable()
 export class BillingScheduledService {
   constructor(
@@ -16,11 +18,10 @@ export class BillingScheduledService {
     private usageMetricsService: UsageMetricsService,
   ) {}
 
-  //every 5th minute
-  @Interval(1000)
+  @Interval(FIVE_MINUTES_IN_MILLIS)
   async checkPlansForCancellation() {
     const plans = await this.planService.getPlans({
-      status: 'SCHEDULED_FOR_CANCELLATION',
+      status: 'ACTIVE',
       cancelAt: {
         $lt: new Date(),
       },
