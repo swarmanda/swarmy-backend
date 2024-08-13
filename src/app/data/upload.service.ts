@@ -23,6 +23,9 @@ export class UploadService {
     uploadAsWebsite?: boolean,
     user?: User,
   ): Promise<UploadResultDto> {
+    if (!organization.postageBatchId) {
+      throw new BadRequestException();
+    }
     const stream = Readable.from(file.buffer);
     if (uploadAsWebsite) {
       if (file.mimetype !== 'application/x-tar') {

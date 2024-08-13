@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { UsageMetricsService } from './usage-metrics.service';
 import { FileReferenceService } from './file.service';
 import { BeeService } from '../bee/bee.service';
@@ -14,6 +14,9 @@ export class DownloadService {
   ) {}
 
   async download(org: Organization, hash: string, path?: string): Promise<DownloadResult> {
+    if (!org.postageBatchId) {
+      throw new BadRequestException();
+    }
     const fileRef = await this.fileReferenceService.getFileReference(org, hash);
     if (!fileRef) {
       throw new NotFoundException();
