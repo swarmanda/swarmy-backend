@@ -91,11 +91,11 @@ export class UserService {
       throw new BadRequestException();
     }
     this.logger.info(user);
-    const elapsedSeconds = this.getElapsedSeconds(user.resetPasswordToken);
+    const elapsedSeconds = this.getElapsedSeconds(user.emailVerificationCode);
 
     if (elapsedSeconds < 20) {
       this.logger.debug(
-        `Can't send verification email, last code was sent less than 20 seconds ago. ${user.resetPasswordToken}`,
+        `Can't send verification email, last code was sent less than 20 seconds ago. ${user.emailVerificationCode}`,
       );
       throw new BadRequestException();
     }
