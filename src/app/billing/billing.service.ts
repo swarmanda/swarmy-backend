@@ -143,13 +143,13 @@ export class BillingService {
       status: 'CANCELLED',
       statusReason: `UPGRADED_TO: ${newPlan._id}`,
     });
-    await this.usageMetricsService.upgrade(planToUpgrade.organizationId, newPlan.quotas);
+    await this.usageMetricsService.upgradeCurrentMetrics(planToUpgrade.organizationId, newPlan.quotas);
   }
 
   private async activateNewPlan(organizationId: string, planId: string) {
     this.logger.info(`Activating plan: ${planId}`);
     const plan = await this.planService.activatePlan(organizationId, planId);
-    await this.usageMetricsService.upgrade(organizationId, plan.quotas);
+    await this.usageMetricsService.upgradeCurrentMetrics(organizationId, plan.quotas);
     return plan;
   }
 

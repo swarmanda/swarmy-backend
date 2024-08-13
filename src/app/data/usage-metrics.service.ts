@@ -18,20 +18,13 @@ export class UsageMetricsService {
     private planService: PlanService,
   ) {}
 
-  async increment(
-    organizationId: string,
-    type: UsageMetricType,
-    value: number,
-    period: string = this.getCurrentPeriod(),
-  ) {
-    this.logger.info(`updating usage metrics org: ${organizationId}, period: ${period}, type: ${type}`);
-
-    const updatedMetrics = await this.updateMetrics(organizationId, period, type, {
+  async increment(metric: UsageMetrics, value: number) {
+    this.logger.debug(
+      `Incrementing usage metrics id: ${metric._id} org: ${metric.organizationId}, period: ${metric.period}, type: ${metric.type} to used ${metric.used + value}`,
+    );
+    return await this.updateMetricsById(metric._id.toString(), {
       $inc: { used: value },
     });
-    if (!updatedMetrics) {
-      return await this.initializeMetrics(organizationId, type, period, value);
-    }
   }
 
   private async initializeMetrics(
@@ -59,6 +52,10 @@ export class UsageMetricsService {
     }).save();
   }
 
+  async updateMetricsById(metricId: string, update: any) {
+    return (await this.usageMetricsModel.findOneAndUpdate({ _id: metricId }, update)) as UsageMetrics;
+  }
+
   async updateMetrics(organizationId: string, period: string, type: UsageMetricType, update: any) {
     return (await this.usageMetricsModel.findOneAndUpdate(
       {
@@ -70,7 +67,7 @@ export class UsageMetricsService {
     )) as UsageMetrics;
   }
 
-  async getForOrganization(organizationId: string, type?: UsageMetricType): Promise<UsageMetrics> {
+  async getForOrganization(organizationId: string, type: UsageMetricType): Promise<UsageMetrics> {
     //todo get active plan
     const filter: FilterQuery<UsageMetrics> = {
       organizationId,
@@ -79,7 +76,12 @@ export class UsageMetricsService {
     if (type) {
       filter.type = type;
     }
-    return (await this.usageMetricsModel.findOne(filter)) as UsageMetrics;
+    let result = await this.usageMetricsModel.findOne(filter);
+    if (!result) {
+      const period = type === 'UPLOADED_BYTES' ? LIFETIME_PERIOD : this.getCurrentPeriod();
+      result = await this.initializeMetrics(organizationId, type, period, 0);
+    }
+    return result;
   }
 
   async getAllForOrganization(organizationId: string): Promise<UsageMetrics[]> {
@@ -90,9 +92,14 @@ export class UsageMetricsService {
     })) as UsageMetrics[];
   }
 
-  async upgrade(organizationId: string, quotas: PlanQuota) {
+  async upgradeCurrentMetrics(organizationId: string, quotas: PlanQuota) {
     await this.upsert(organizationId, 'UPLOADED_BYTES', LIFETIME_PERIOD, quotas.uploadSizeLimit);
     await this.upsert(organizationId, 'DOWNLOADED_BYTES', this.getCurrentPeriod(), quotas.downloadSizeLimit);
+  }
+
+  async resetCurrentMetrics(organizationId: string) {
+    await this.upsert(organizationId, 'UPLOADED_BYTES', LIFETIME_PERIOD, 0, 0);
+    await this.upsert(organizationId, 'DOWNLOADED_BYTES', this.getCurrentPeriod(), 0, 0);
   }
 
   private async upsert(
@@ -125,10 +132,5 @@ export class UsageMetricsService {
     const now = new Date();
     const month = `${now.getUTCMonth() + 1}`.padStart(2, '0');
     return `${now.getUTCFullYear()}-${month}`;
-  }
-
-  async resetCurrentMetrics(organizationId: string) {
-    await this.upsert(organizationId, 'UPLOADED_BYTES', LIFETIME_PERIOD, 0, 0);
-    await this.upsert(organizationId, 'DOWNLOADED_BYTES', this.getCurrentPeriod(), 0, 0);
   }
 }

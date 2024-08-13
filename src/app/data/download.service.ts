@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { UsageMetricsService } from './usage-metrics.service';
 import { FileReferenceService } from './file.service';
 import { BeeService } from '../bee/bee.service';
 import { DownloadResult } from './download-result';
 import { Organization } from '../organization/organization.schema';
+import { FileReference } from './file.schema';
 
 @Injectable()
 export class DownloadService {
@@ -22,8 +23,8 @@ export class DownloadService {
       throw new NotFoundException();
     }
     const result = await this.beeService.download(hash, path);
-
-    this.usageMetricsService.increment(org._id.toString(), 'DOWNLOADED_BYTES', fileRef.size).catch((e) => {
+    const metric = await this.validateDownloadLimit(org, fileRef);
+    this.usageMetricsService.increment(metric, fileRef.size).catch((e) => {
       console.error('Failed to handle download event', e);
     });
 
@@ -33,5 +34,14 @@ export class DownloadService {
       },
       data: result.data,
     };
+  }
+
+  private async validateDownloadLimit(org: Organization, fileRef: FileReference) {
+    const metric = await this.usageMetricsService.getForOrganization(org._id.toString(), 'DOWNLOADED_BYTES');
+    const remaining = metric.available - metric.used;
+    if (remaining < fileRef.size) {
+      throw new UnprocessableEntityException(`Download limit reached.`);
+    }
+    return metric;
   }
 }

@@ -72,15 +72,12 @@ export class DataController {
     @Res() response: Response,
     @Req() request: Request,
   ) {
-    try {
-      const result = await this.downloadService.download(org, hash);
-      for (const key in result.headers) {
-        response.header(key, result.headers[key]);
-      }
-      return response.status(200).cookie('k', request['key']).send(Buffer.from(result.data.buffer));
-    } catch (error) {
-      return response.status(404).json({ message: 'not found' });
+    const result = await this.downloadService.download(org, hash);
+    for (const key in result.headers) {
+      response.header(key, result.headers[key]);
     }
+    // todo maybe add cookie only for sites
+    return response.status(200).cookie('k', request['key']).send(Buffer.from(result.data.buffer));
   }
 
   @Public()
