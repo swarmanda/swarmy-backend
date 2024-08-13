@@ -15,7 +15,14 @@ export class Organization {
   postageBatchId: string;
 
   @Prop()
-  postageBatchStatus: null | 'CREATING' | 'CREATED' | 'FAILED_TO_CREATE' | 'FAILED_TO_TOP_UP' | 'FAILED_TO_DILUTE';
+  postageBatchStatus:
+    | null
+    | 'CREATING'
+    | 'CREATED'
+    | 'FAILED_TO_CREATE'
+    | 'FAILED_TO_TOP_UP'
+    | 'FAILED_TO_DILUTE'
+    | 'REMOVED';
 
   @Prop({ type: OrganizationConfig })
   config?: OrganizationConfig;

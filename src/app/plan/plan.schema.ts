@@ -31,11 +31,17 @@ export class Plan {
 
   @Prop({ required: true, type: PlanQuota })
   quotas: PlanQuota;
+
+  @Prop()
+  paidTill: Date;
+
+  @Prop()
+  cancelAt: Date;
   //
   // @Prop()
   // stripeCustomerId: string;
 }
 
-export type PlanStatus = 'PENDING_PAYMENT' | 'ACTIVE' | 'CANCELLED';
+export type PlanStatus = 'PENDING_PAYMENT' | 'ACTIVE' | 'SCHEDULED_FOR_CANCELLATION' | 'CANCELLED';
 
 export const PlanSchema = SchemaFactory.createForClass(Plan);

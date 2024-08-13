@@ -12,6 +12,7 @@ import { calculateDepthAndAmount, subscriptionConfig } from '../plan/subscriptio
 import { UsageMetricsService } from '../data/usage-metrics.service';
 import { Plan } from '../plan/plan.schema';
 import { Organization } from '../organization/organization.schema';
+import { addMonths } from 'date-fns';
 
 @Injectable()
 export class BillingService {
@@ -168,6 +169,9 @@ export class BillingService {
       const payment = await this.paymentService.getPaymentByMerchantTransactionId(merchantTransactionId);
       this.logger.debug(`Creating successful payment for plan: ${payment.planId}`);
 
+      const plan = await this.planService.activatePlan(payment.organizationId, payment.planId);
+      const paidTill = addMonths(plan.paidTill, 1);
+      this.planService.updatePlan(payment.planId, { paidTill });
       await this.paymentService.createPayment({
         amount: object.amount_paid,
         currency: object.currency,
@@ -214,10 +218,7 @@ export class BillingService {
 
   async cancelPlan(org: Organization) {
     this.logger.info(`Cancelling plan for organization ${org._id}.`);
-    const plan = await this.planService.cancelActivePlan(org._id.toString());
-    this.logger.info(`Removing postageBatchId ${org.postageBatchId} from organization ${org._id}.`);
-    await this.organizationService.update(org._id.toString(), { postageBatchId: null });
-    await this.usageMetricsService.resetCurrentMetrics(org._id.toString());
+    const plan = await this.planService.scheduleActivePlanForCancellation(org._id.toString());
     // todo cancel stripe subscription
   }
 

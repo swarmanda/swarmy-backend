@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Plan } from './plan.schema';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { addMonths } from 'date-fns';
 
 @Injectable()
 export class PlanService {
@@ -33,14 +34,24 @@ export class PlanService {
       throw new BadRequestException('There is already an active plan for this organization', organizationId);
     }
 
-    const plan = await this.updatePlan(planId, { status: 'ACTIVE' });
+    const now = new Date();
+    const paidTill = addMonths(now, 1);
+    const plan = await this.updatePlan(planId, { status: 'ACTIVE', paidTill });
     this.logger.info('Plan activated ', plan._id);
     return plan;
   }
 
-  async cancelActivePlan(organizationId: string) {
+  async cancelPlan(orgId: string, planId: string) {
+    const plan = await this.getPlanById(orgId, planId);
+    return await this.updatePlan(plan._id.toString(), { status: 'CANCELLED' });
+  }
+
+  async scheduleActivePlanForCancellation(organizationId: string) {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
-    return await this.updatePlan(existingActivePlan._id.toString(), { status: 'CANCELLED' });
+    return await this.updatePlan(existingActivePlan._id.toString(), {
+      status: 'SCHEDULED_FOR_CANCELLATION',
+      cancelAt: existingActivePlan.paidTill,
+    });
   }
 
   async updatePlan(_id: string, update: Partial<Plan>): Promise<Plan> {
@@ -52,5 +63,9 @@ export class PlanService {
       organizationId,
       _id: planId,
     })) as Plan;
+  }
+
+  async getPlans(filter: Record<string, any>): Promise<Plan[]> {
+    return this.planModel.find(filter);
   }
 }
