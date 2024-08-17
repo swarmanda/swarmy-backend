@@ -14,6 +14,7 @@ import { HealthcheckModule } from './healthcheck/healthcheck.module';
 import { StaticTextModule } from './static-text/static-text.module';
 import { EmailModule } from './email/email.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { MonitorModule } from './monitor/monitor.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     HealthcheckModule,
     StaticTextModule,
     EmailModule,
+    MonitorModule,
 
     LoggerModule.forRootAsync({
       imports: [ConfigModule],
