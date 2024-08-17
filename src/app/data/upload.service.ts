@@ -37,6 +37,8 @@ export class UploadService {
     }
     const size = this.roundUp(file.size, BEE_MIN_CHUNK_SIZE);
     const metric = await this.validateUploadLimit(organization, size);
+    await this.usageMetricsService.increment(metric, size);
+    // todo add decrement on failure
     const result = await this.beeService.upload(
       organization.postageBatchId,
       stream,
@@ -50,7 +52,6 @@ export class UploadService {
     }
 
     await this.fileReferenceService.createFileReference(result.reference, organization, file, uploadAsWebsite, user);
-    await this.usageMetricsService.increment(metric, size);
     return { url: result.reference };
   }
 

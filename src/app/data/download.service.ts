@@ -22,11 +22,11 @@ export class DownloadService {
     if (!fileRef) {
       throw new NotFoundException();
     }
-    const result = await this.beeService.download(hash, path);
     const metric = await this.validateDownloadLimit(org, fileRef);
     this.usageMetricsService.increment(metric, fileRef.size).catch((e) => {
       console.error('Failed to handle download event', e);
     });
+    const result = await this.beeService.download(hash, path);
 
     return {
       headers: {

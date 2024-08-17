@@ -1,4 +1,17 @@
-import { Body, Controller, Get, Param, Post, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  MaxFileSizeValidator,
+  Param,
+  ParseFilePipe,
+  Post,
+  Req,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadResultDto } from './upload.result.dto';
@@ -15,6 +28,8 @@ import { Buffer } from 'safe-buffer';
 import { OrganizationInContext } from '../organization/organization.decorator';
 import { Organization } from '../organization/organization.schema';
 
+const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1gb
+
 @Controller()
 export class DataController {
   constructor(
@@ -29,7 +44,12 @@ export class DataController {
   uploadFile(
     @OrganizationInContext() org: Organization,
     @UserInContext() user: User,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })],
+      }),
+    )
+    file: Express.Multer.File,
     @Body() body: any,
   ): UploadResultDto {
     return this.uploadService.uploadFile(org, file, body.website, user);
@@ -41,7 +61,12 @@ export class DataController {
   @UseInterceptors(FileInterceptor('file'))
   uploadFileApi(
     @OrganizationInContext() org: Organization,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })],
+      }),
+    )
+    file: Express.Multer.File,
     @Body() body: unknown,
   ): UploadResultDto {
     console.log(body);
