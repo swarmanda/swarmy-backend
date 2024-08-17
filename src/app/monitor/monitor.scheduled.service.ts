@@ -43,13 +43,16 @@ export class MonitorScheduledService {
     }
 
     const days = this.secondToDays(batch.batchTTL);
-    this.logger.info(
-      `Batch TTL Monitor -  batchId: ${batch.batchID}, TTL: ${batch.batchTTL} (${days} days), utilization: ${batch.utilization}, amount: ${batch.amount}`,
-    );
+
+    const msg = `Batch TTL Monitor -  batchId: ${batch.batchID}, TTL: ${batch.batchTTL} (${days.toFixed(2)} days), utilization: ${batch.utilization}, amount: ${batch.amount}`;
+    if (days > 3) {
+      this.logger.info(msg);
+    } else {
+      this.logger.warn(msg);
+    }
   }
 
   private secondToDays(seconds: number) {
-    const days = Math.floor((seconds % 31536000) / 86400);
-    return days.toFixed(1);
+    return Math.floor((seconds % 31536000) / 86400);
   }
 }
