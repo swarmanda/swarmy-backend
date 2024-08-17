@@ -7,8 +7,7 @@ import { Organization } from '../organization/organization.schema';
 import { BeeService } from '../bee/bee.service';
 import { PostageBatch } from '@ethersphere/bee-js';
 
-// const FIVE_MINUTES_IN_MILLIS = 5 * 60 * 1000;
-const FIVE_MINUTES_IN_MILLIS = 1 * 1000;
+const FIVE_MINUTES_IN_MILLIS = 5 * 60 * 1000;
 
 @Injectable()
 export class MonitorScheduledService {
