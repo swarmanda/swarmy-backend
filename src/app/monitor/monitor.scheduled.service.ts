@@ -7,7 +7,7 @@ import { Organization } from '../organization/organization.schema';
 import { BeeService } from '../bee/bee.service';
 import { PostageBatch } from '@ethersphere/bee-js';
 
-const FIVE_MINUTES_IN_MILLIS = 30 * 1000;
+const THIRTY_MINUTES = 30 * 60 * 1000;
 
 @Injectable()
 export class MonitorScheduledService {
@@ -19,7 +19,7 @@ export class MonitorScheduledService {
     private readonly organizationService: OrganizationService,
   ) {}
 
-  @Interval(FIVE_MINUTES_IN_MILLIS)
+  @Interval(THIRTY_MINUTES)
   async checkPostageBatchTTL() {
     const plans = await this.planService.getPlans({ status: 'ACTIVE' });
     const batches = await this.beeService.getAllPostageBatches();
