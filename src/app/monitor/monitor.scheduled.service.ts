@@ -7,7 +7,7 @@ import { Organization } from '../organization/organization.schema';
 import { BeeService } from '../bee/bee.service';
 import { PostageBatch } from '@ethersphere/bee-js';
 
-const FIVE_MINUTES_IN_MILLIS = 5 * 60 * 1000;
+const FIVE_MINUTES_IN_MILLIS = 30 * 1000;
 
 @Injectable()
 export class MonitorScheduledService {
@@ -23,7 +23,7 @@ export class MonitorScheduledService {
   async checkPostageBatchTTL() {
     const plans = await this.planService.getPlans({ status: 'ACTIVE' });
     const batches = await this.beeService.getAllPostageBatches();
-    console.log(batches.length)
+    console.log(batches.length);
     if (plans.length !== batches.length) {
       this.logger.warn(
         `Number of active plans and number of batches do not match. Plans: ${plans.length}, batches: ${batches.length}`,
@@ -42,33 +42,14 @@ export class MonitorScheduledService {
       return;
     }
 
-    const duration = this.toHumanReadableDuration(batch.batchTTL);
+    const days = this.secondToDays(batch.batchTTL);
     this.logger.info(
-      `BatchId ${batch.batchID} - TTL: ${batch.batchTTL} (${duration.value} ${duration.label}), 
-      utilization: ${batch.utilization}, amount: ${batch.amount}`,
+      `Batch TTL Monitor -  batchId: ${batch.batchID}, TTL: ${batch.batchTTL} (${days} days), utilization: ${batch.utilization}, amount: ${batch.amount}`,
     );
   }
 
-  private toHumanReadableDuration(seconds: number) {
+  private secondToDays(seconds: number) {
     const days = Math.floor((seconds % 31536000) / 86400);
-    const hours = Math.floor(((seconds % 31536000) % 86400) / 3600);
-    const minutes = Math.floor((((seconds % 31536000) % 86400) % 3600) / 60);
-
-    if (days > 0) {
-      return {
-        value: days.toFixed(1),
-        label: 'days',
-      };
-    }
-    if (hours > 0) {
-      return {
-        value: hours.toFixed(1),
-        label: 'hours',
-      };
-    }
-    return {
-      value: minutes.toFixed(1),
-      label: 'minutes',
-    };
+    return days.toFixed(1);
   }
 }
