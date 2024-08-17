@@ -8,7 +8,7 @@ import { BeeService } from '../bee/bee.service';
 import { PostageBatch } from '@ethersphere/bee-js';
 
 // const FIVE_MINUTES_IN_MILLIS = 5 * 60 * 1000;
-const FIVE_MINUTES_IN_MILLIS = 10 * 1000;
+const FIVE_MINUTES_IN_MILLIS = 1 * 1000;
 
 @Injectable()
 export class MonitorScheduledService {
@@ -21,9 +21,10 @@ export class MonitorScheduledService {
   ) {}
 
   @Interval(FIVE_MINUTES_IN_MILLIS)
-  async checkPostageBatchTTL(org: Organization) {
+  async checkPostageBatchTTL() {
     const plans = await this.planService.getPlans({ status: 'ACTIVE' });
     const batches = await this.beeService.getAllPostageBatches();
+    console.log(batches.length)
     if (plans.length !== batches.length) {
       this.logger.warn(
         `Number of active plans and number of batches do not match. Plans: ${plans.length}, batches: ${batches.length}`,
@@ -38,7 +39,7 @@ export class MonitorScheduledService {
   private async checkTTL(org: Organization, batches: PostageBatch[]) {
     const batch = batches.find((batch) => batch.batchID === org.postageBatchId);
     if (!batch) {
-      this.logger.warn('There is no batch with id on the bee instance:' + org.postageBatchId);
+      this.logger.warn(`There is no batch with id on the bee instance. Org: ${org._id}, batchId:` + org.postageBatchId);
       return;
     }
 
