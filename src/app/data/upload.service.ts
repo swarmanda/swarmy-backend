@@ -26,9 +26,7 @@ export class UploadService {
     uploadAsWebsite?: boolean,
     user?: User,
   ): Promise<UploadResultDto> {
-    if (!organization.postageBatchId) {
-      throw new BadRequestException();
-    }
+    await this.verifyPostageBatch(organization);
     const stream = Readable.from(file.buffer);
     if (uploadAsWebsite) {
       if (file.mimetype !== 'application/x-tar') {
@@ -53,6 +51,18 @@ export class UploadService {
 
     await this.fileReferenceService.createFileReference(result.reference, organization, file, uploadAsWebsite, user);
     return { url: result.reference };
+  }
+
+  private async verifyPostageBatch(org: Organization) {
+    if (!org.postageBatchId) {
+      this.logger.info(`Upload attempted org ${org._id} that doesn't have a postage batch`);
+      throw new BadRequestException();
+    }
+    const batch = await this.beeService.getPostageBatch(org.postageBatchId);
+    if (!batch) {
+      this.logger.error(`Upload attempted with postage batch id ${org.postageBatchId} that doesn't exist on bee`);
+      throw new BadRequestException();
+    }
   }
 
   private async validateUploadLimit(organization: Organization, size: number) {

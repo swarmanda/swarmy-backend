@@ -35,6 +35,10 @@ export class BeeService {
     return await this.bee.getAllPostageBatch();
   }
 
+  async getPostageBatch(postageBatchId: string) {
+    return await this.bee.getPostageBatch(postageBatchId);
+  }
+
   async createPostageBatch(amount: string, depth: number): Promise<BatchId> {
     return await this.bee.createPostageBatch(amount, depth, { waitForUsable: true, waitForUsableTimeout: 480_000 });
   }

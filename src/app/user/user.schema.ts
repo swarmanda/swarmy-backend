@@ -24,6 +24,9 @@ export class User {
 
   @Prop()
   resetPasswordToken: string;
+
+  @Prop({ required: true })
+  enabled: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

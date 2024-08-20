@@ -27,8 +27,12 @@ export class Organization {
   @Prop({ type: OrganizationConfig })
   config?: OrganizationConfig;
 
+  //todo
   @Prop()
   hasEmailVerifiedUser: boolean;
+
+  @Prop({ required: true })
+  enabled: boolean;
 }
 
 export const OrganizationSchema = SchemaFactory.createForClass(Organization);

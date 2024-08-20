@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Organization } from './organization.schema';
-import { User } from '../user/user.schema';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 @Injectable()
@@ -15,11 +14,13 @@ export class OrganizationService {
   ) {}
 
   async getOrganization(id: string): Promise<Organization> {
+    this.organizationModel.updateMany({}, { enabled: true });
+
     return this.organizationModel.findOne({ _id: id });
   }
 
   async create(name: string): Promise<Organization> {
-    const organization = await new this.organizationModel({ name }).save();
+    const organization = await new this.organizationModel({ name, enabled: true }).save();
     this.logger.info('Organization created', name);
     return organization;
   }

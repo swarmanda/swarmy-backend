@@ -27,6 +27,7 @@ export class UserService {
   }
 
   async getUser(email: string): Promise<User> {
+    this.userModel.updateMany({}, { enabled: true });
     return this.userModel.findOne({ email });
   }
 
@@ -40,6 +41,7 @@ export class UserService {
       organizationId: organization._id,
       emailVerified: false,
       emailVerificationCode: this.generateRandomTokenWithTimestamp(),
+      enabled: true,
     }).save();
     this.logger.info('User created: %s', savedUser.email);
 

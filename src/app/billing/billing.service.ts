@@ -39,8 +39,6 @@ export class BillingService {
         // console.log(event)
         // console.debug(object);
         const object = event.data.object as any;
-        console.log(event.data);
-        console.log(event.data.object);
         const merchantTransactionId = object.client_reference_id;
         const stripeCustomerId = object.customer;
         await this.handleCheckoutSessionCompleted(merchantTransactionId, stripeCustomerId);
@@ -158,20 +156,20 @@ export class BillingService {
     const merchantTransactionId = object.subscription_details.metadata.client_reference_id;
     this.logger.info(`Processing invoicePaid for merchantTransactionId: ${merchantTransactionId}`);
 
+    // initial payment
+    // todo check if client ref id is passed for recurring transactions. If not, look up org by email or sub id?
     const payment = await this.paymentService.getPaymentByMerchantTransactionId(merchantTransactionId);
 
     if (object.billing_reason === 'subscription_create') {
       this.logger.info(`Billing reason is 'subscription_create', skipping processing event.`);
     } else {
-      // recurring payment, there must be already one
-      // todo check if client ref id is passed for recurring transactions
-      // todo swarm topup
-      const payment = await this.paymentService.getPaymentByMerchantTransactionId(merchantTransactionId);
+      // recurring payment, there must be already a plan at this point
       this.logger.debug(`Creating successful payment for plan: ${payment.planId}`);
 
       const plan = await this.planService.activatePlan(payment.organizationId, payment.planId);
+      const org = await this.organizationService.getOrganization(payment.organizationId);
       const paidTill = addMonths(plan.paidTill, 1);
-      this.planService.updatePlan(payment.planId, { paidTill });
+      await this.planService.updatePlan(payment.planId, { paidTill });
       await this.paymentService.createPayment({
         amount: object.amount_paid,
         currency: object.currency,
@@ -179,41 +177,8 @@ export class BillingService {
         organizationId: payment.organizationId,
         status: 'SUCCESS',
       });
+      this.topUp(org, plan);
     }
-
-    //
-    // let stripeCustomerId = null;
-    // const customer = stripeCustomerId as Stripe.Customer;
-    // if (typeof object.customer === 'string') {
-    //   stripeCustomerId = object.customer;
-    // } else {
-    //   stripeCustomerId = object.customer.id;
-    // }
-
-    // let plan = null;
-    // const maxRetries = 10;
-    // for (let i = 1; i <= maxRetries; i++) {
-    //   plan = this.planService.getActivePlanByStripeCustomerId(stripeCustomerId);
-    //   if (plan) {
-    //     break;
-    //   } else {
-    //     this.logger.debug(`Can't find plan by stripeCustomerId ${stripeCustomerId}. Retrying (${i}/${maxRetries})`);
-    //   }
-    // }
-    // if (!plan) {
-    //   this.logger.error(`Failed to retrieve plan by stripeCustomerId ${stripeCustomerId}. Ran out of retries.`);
-    //   return;
-    // }
-    //
-    // this.logger.debug(`Creating successful payment for plan: ${plan.id}`);
-    //
-    // await this.paymentService.createPayment({
-    //   amount: object.amount_paid,
-    //   currency: object.currency,
-    //   planId: plan.id,
-    //   organizationId: plan.organizationId,
-    //   status: 'SUCCESS',
-    // });
   }
 
   async cancelPlan(org: Organization) {
@@ -227,7 +192,8 @@ export class BillingService {
     await this.organizationService.update(organizationId, { postageBatchStatus: 'CREATING' });
     try {
       const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-      const days = org?.config?.topUpDays ?? 31;
+      // top up for 35 days for tolerating late recurring payments
+      const days = org?.config?.topUpDays ?? 35;
       const config = calculateDepthAndAmount(days, requestedGbs);
       this.logger.info(
         `Creating postage batch. Amount: ${config.amount}, depth: ${config.depth}, cost: BZZ ${config.bzzPrice}`,
@@ -244,6 +210,26 @@ export class BillingService {
     }
   }
 
+  private async topUp(org: Organization, plan: Plan) {
+    const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
+    const days = org?.config?.topUpDays ?? 31;
+    const config = calculateDepthAndAmount(days, requestedGbs);
+    // todo dev mode set fix depth
+    const amount = config.amount.toFixed(0);
+    await this.tryTopUp(org, amount, days);
+  }
+
+  private async tryTopUp(org: Organization, amount: string, days: number) {
+    try {
+      this.logger.info(`Performing topUp on ${org.postageBatchId} with amount: ${amount}. (days: ${days})`);
+      await this.beeService.topUp(org.postageBatchId, amount);
+    } catch (e) {
+      this.logger.error(e, `TopUp operation failed. Skipping diluting. Org: ${org._id}`);
+      await this.organizationService.update(org._id.toString(), { postageBatchStatus: 'FAILED_TO_TOP_UP' });
+      return;
+    }
+  }
+
   private async topUpAndDilute(org: Organization, plan: Plan) {
     //todo calculate minimum required top up amount
     //todo check if dilute is needed
@@ -254,14 +240,7 @@ export class BillingService {
     const config = calculateDepthAndAmount(days, requestedGbs);
     // todo dev mode set fix depth
     const amount = config.amount.toFixed(0);
-    try {
-      this.logger.info(`Performing topUp on ${org.postageBatchId} with amount: ${amount}. (days: ${days})`);
-      await this.beeService.topUp(org.postageBatchId, amount);
-    } catch (e) {
-      this.logger.error(e, `TopUp operation failed. Skipping diluting. Org: ${org._id}`);
-      await this.organizationService.update(org._id.toString(), { postageBatchStatus: 'FAILED_TO_TOP_UP' });
-      return;
-    }
+    this.tryTopUp(org, amount, days);
     try {
       await this.beeService.dilute(org.postageBatchId, config.depth);
     } catch (e) {

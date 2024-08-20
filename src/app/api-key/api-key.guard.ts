@@ -18,11 +18,11 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException();
     }
     let apiKey = null;
+    let org = null;
     try {
       apiKey = await this.apiKeyService.getApiKeyBySecret(token);
       if (apiKey.status === 'ACTIVE') {
-        request['organization'] = await this.organizationService.getOrganization(apiKey.organizationId);
-        request['key'] = token;
+        org = await this.organizationService.getOrganization(apiKey.organizationId);
       }
     } catch (e) {
       console.error('Failed to verify API key', e);
@@ -31,6 +31,12 @@ export class ApiKeyGuard implements CanActivate {
     if (!apiKey || apiKey.status !== 'ACTIVE') {
       throw new UnauthorizedException('API key is invalid');
     }
+    if (!org || !org.enabled) {
+      throw new UnauthorizedException('You shall not pass');
+    }
+
+    request['organization'] = org;
+    request['key'] = token;
     return true;
   }
 

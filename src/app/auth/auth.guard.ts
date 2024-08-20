@@ -7,6 +7,7 @@ import { IS_PUBLIC_KEY } from './public.decorator';
 import { UserService } from '../user/user.service';
 import { OrganizationService } from '../organization/organization.service';
 import { User } from '../user/user.schema';
+import { Organization } from '../organization/organization.schema';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -32,17 +33,14 @@ export class AuthGuard implements CanActivate {
     if (!token) {
       throw new UnauthorizedException();
     }
-    let user: User;
-    try {
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: jwtConstants.secret,
-      });
-      user = await this.userService.getUser(payload.email);
-      request['user'] = user;
-      request['organization'] = await this.organizationService.getOrganization(user.organizationId);
-    } catch {
-      throw new UnauthorizedException('Unauthorized');
-    }
+    const payload = await this.jwtService.verifyAsync(token, {
+      secret: jwtConstants.secret,
+    });
+    const user = await this.getUserOrThrow(payload.email);
+    const org = await this.getOrganizationOrThrow(user.organizationId);
+
+    request['user'] = user;
+    request['organization'] = org;
 
     if (!user.emailVerified) {
       if (['/users/resend-email-verification-by-user', '/users/me'].includes(request.path)) {
@@ -51,6 +49,32 @@ export class AuthGuard implements CanActivate {
       throw new ForbiddenException();
     }
     return true;
+  }
+
+  private async getUserOrThrow(email: string) {
+    let user: User;
+    try {
+      user = await this.userService.getUser(email);
+    } catch {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    if (!user || !user.enabled) {
+      throw new UnauthorizedException('You shall not pass');
+    }
+    return user;
+  }
+
+  private async getOrganizationOrThrow(orgId: string) {
+    let org: Organization;
+    try {
+      org = await this.organizationService.getOrganization(orgId);
+    } catch {
+      throw new UnauthorizedException('Unauthorized');
+    }
+    if (!org || !org.enabled) {
+      throw new UnauthorizedException('You shall not pass');
+    }
+    return org;
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
