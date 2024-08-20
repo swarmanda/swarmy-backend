@@ -24,10 +24,10 @@ export class UserService {
     private emailService: EmailService,
   ) {
     this.frontendUrl = configService.get<string>('FRONTEND_URL');
+    this.userModel.updateMany({}, { enabled: true });
   }
 
   async getUser(email: string): Promise<User> {
-    this.userModel.updateMany({}, { enabled: true });
     return this.userModel.findOne({ email });
   }
 

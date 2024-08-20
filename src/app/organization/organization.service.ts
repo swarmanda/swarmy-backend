@@ -11,11 +11,11 @@ export class OrganizationService {
     private readonly logger: PinoLogger,
     @InjectModel(Organization.name)
     private organizationModel: Model<Organization>,
-  ) {}
+  ) {
+    this.organizationModel.updateMany({}, { enabled: true });
+  }
 
   async getOrganization(id: string): Promise<Organization> {
-    this.organizationModel.updateMany({}, { enabled: true });
-
     return this.organizationModel.findOne({ _id: id });
   }
 
