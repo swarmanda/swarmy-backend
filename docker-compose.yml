@@ -9,5 +9,12 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: root
     volumes:
       - db_data:/data/db
+  bee:
+    image: ethersphere/bee:stable
+    ports:
+      - '1633:1633'
+    command:
+      - dev
 volumes:
   db_data:
+

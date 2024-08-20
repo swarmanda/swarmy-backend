@@ -1,11 +1,15 @@
+# Swarm as a service backend
 
-## Description
 
 ## Installation
 
 ```bash
 $ npm install
 ```
+
+## Configuration
+
+Create `.env` file in the project root, see `.env.example`
 
 ## Running the app
 
@@ -20,19 +24,15 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
-## Test
+## External dependencies:
+- MongoDB  
+- Bee
 
+For development, they can be started with Docker compose:
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker-compose up
 ```
 
-## Stay in touch
 
 ## License
+MIT
