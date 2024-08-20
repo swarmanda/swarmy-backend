@@ -35,6 +35,10 @@ export class BeeService {
     return await this.bee.getAllPostageBatch();
   }
 
+  async getWallet() {
+    return await this.bee.getWalletBalance();
+  }
+
   async getPostageBatch(postageBatchId: string) {
     return await this.bee.getPostageBatch(postageBatchId);
   }

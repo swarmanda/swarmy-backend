@@ -10,9 +10,9 @@ import { PostageBatch } from '@ethersphere/bee-js';
 const THIRTY_MINUTES = 30 * 60 * 1000;
 
 @Injectable()
-export class MonitorScheduledService {
+export class ExpirationMonitorScheduledService {
   constructor(
-    @InjectPinoLogger(MonitorScheduledService.name)
+    @InjectPinoLogger(ExpirationMonitorScheduledService.name)
     private readonly logger: PinoLogger,
     private readonly beeService: BeeService,
     private readonly planService: PlanService,
@@ -23,7 +23,6 @@ export class MonitorScheduledService {
   async checkPostageBatchTTL() {
     const plans = await this.planService.getPlans({ status: 'ACTIVE' });
     const batches = await this.beeService.getAllPostageBatches();
-    console.log(batches.length);
     if (plans.length !== batches.length) {
       this.logger.warn(
         `Number of active plans and number of batches do not match. Plans: ${plans.length}, batches: ${batches.length}`,
