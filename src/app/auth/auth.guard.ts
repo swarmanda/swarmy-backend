@@ -1,6 +1,5 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { jwtConstants } from './auth.constants';
 import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from './public.decorator';
@@ -8,15 +7,21 @@ import { UserService } from '../user/user.service';
 import { OrganizationService } from '../organization/organization.service';
 import { User } from '../user/user.schema';
 import { Organization } from '../organization/organization.schema';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
+  private readonly jwtSecret: string;
+
   constructor(
+    configService: ConfigService,
     private jwtService: JwtService,
     private reflector: Reflector,
     private userService: UserService,
     private organizationService: OrganizationService,
-  ) {}
+  ) {
+    this.jwtSecret = configService.get<string>('JWT_SECRET');
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // if endpoint has public(), don't run auth
@@ -33,9 +38,7 @@ export class AuthGuard implements CanActivate {
     if (!token) {
       throw new UnauthorizedException();
     }
-    const payload = await this.jwtService.verifyAsync(token, {
-      secret: jwtConstants.secret,
-    });
+    const payload = await this.verifyOrThrow(token);
     const user = await this.getUserOrThrow(payload.email);
     const org = await this.getOrganizationOrThrow(user.organizationId);
 
@@ -49,6 +52,16 @@ export class AuthGuard implements CanActivate {
       throw new ForbiddenException();
     }
     return true;
+  }
+
+  private async verifyOrThrow(token: string) {
+    try {
+      return await this.jwtService.verifyAsync(token, {
+        secret: this.jwtSecret,
+      });
+    } catch (error) {
+      throw new UnauthorizedException();
+    }
   }
 
   private async getUserOrThrow(email: string) {
