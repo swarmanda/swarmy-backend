@@ -75,7 +75,7 @@ export class DataController {
 
   @Public()
   @UseGuards(ApiKeyGuard)
-  @Get('api/files/')
+  @Get('api/files')
   async getFileList(@OrganizationInContext() org: Organization) {
     const result = await this.fileReferenceService.getFileReferences(org._id.toString());
     return result.map((f) => ({

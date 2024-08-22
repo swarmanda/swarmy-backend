@@ -29,7 +29,7 @@ export class UploadService {
     await this.verifyPostageBatch(organization);
     const stream = Readable.from(file.buffer);
     if (uploadAsWebsite) {
-      if (file.mimetype !== 'application/x-tar') {
+      if (!['application/x-tar', 'application/octet-stream'].includes(file.mimetype)) {
         throw new BadRequestException('Not a .tar file');
       }
     }
