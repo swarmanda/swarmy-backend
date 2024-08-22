@@ -30,7 +30,7 @@ export class DownloadService {
     });
     const result = await this.beeService.download(hash, path);
 
-    this.logger.info('CONTENT TYPE:', result.contentType);
+    this.logger.info('CONTENT TYPE:' + result.contentType);
     return {
       headers: {
         'Content-Type': fileRef.isWebsite ? result.contentType : fileRef.contentType,
