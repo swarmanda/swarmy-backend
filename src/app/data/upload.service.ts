@@ -58,9 +58,12 @@ export class UploadService {
       this.logger.info(`Upload attempted org ${org._id} that doesn't have a postage batch`);
       throw new BadRequestException();
     }
-    const batch = await this.beeService.getPostageBatch(org.postageBatchId);
-    if (!batch) {
-      this.logger.error(`Upload attempted with postage batch id ${org.postageBatchId} that doesn't exist on bee`);
+    try {
+      await this.beeService.getPostageBatch(org.postageBatchId);
+    } catch (e) {
+      this.logger.error(
+        `Upload attempted by org: ${org._id} with postage batch ${org.postageBatchId} that doesn't exist on bee`,
+      );
       throw new BadRequestException();
     }
   }
