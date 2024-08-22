@@ -2,10 +2,13 @@ import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from
 import { Request } from 'express';
 import { ApiKeyService } from './api-key.service';
 import { OrganizationService } from '../organization/organization.service';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   constructor(
+    @InjectPinoLogger(ApiKeyGuard.name)
+    private readonly logger: PinoLogger,
     private apiKeyService: ApiKeyService,
     private organizationService: OrganizationService,
   ) {}
@@ -21,11 +24,11 @@ export class ApiKeyGuard implements CanActivate {
     let org = null;
     try {
       apiKey = await this.apiKeyService.getApiKeyBySecret(token);
-      if (apiKey.status === 'ACTIVE') {
+      if (apiKey && apiKey.status === 'ACTIVE') {
         org = await this.organizationService.getOrganization(apiKey.organizationId);
       }
     } catch (e) {
-      console.error('Failed to verify API key', e);
+      this.logger.error(e, 'Failed to verify API key');
       throw new UnauthorizedException('Failed to verify API key');
     }
     if (!apiKey || apiKey.status !== 'ACTIVE') {
