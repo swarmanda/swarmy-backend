@@ -2,7 +2,7 @@ export const subscriptionConfig = {
   currency: 'EUR',
   storageCapacity: {
     pricePerGb: 0.2,
-    defaultOption: 6,
+    defaultOption: 4,
     options: [
       // { size: 1, exp: 0, label: '1 GB' },
       // { size: 2, exp: 1, label: '2 GB' },
@@ -19,10 +19,10 @@ export const subscriptionConfig = {
   },
   bandwidth: {
     pricePerGb: 0.05,
-    defaultOption: 6,
+    defaultOption: 5,
     options: [
-      { size: 1, exp: 0, label: '1 GB' },
-      { size: 2, exp: 1, label: '2 GB' },
+      // { size: 1, exp: 0, label: '1 GB' },
+      // { size: 2, exp: 1, label: '2 GB' },
       { size: 4, exp: 2, label: '4 GB' },
       { size: 8, exp: 3, label: '8 GB' },
       { size: 16, exp: 4, label: '16 GB' },
