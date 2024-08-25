@@ -5,6 +5,7 @@ start.sh
 /dist
 /node_modules
 /build
+src/scripts
 
 # Logs
 logs
