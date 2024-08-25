@@ -1,7 +1,7 @@
 export const subscriptionConfig = {
   currency: 'EUR',
   storageCapacity: {
-    pricePerGb: 0.2,
+    pricePerGb: 0.35,
     defaultOption: 4,
     options: [
       // { size: 1, exp: 0, label: '1 GB' },
