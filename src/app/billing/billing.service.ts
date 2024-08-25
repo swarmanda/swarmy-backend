@@ -166,7 +166,7 @@ export class BillingService {
       // recurring payment, there must be already a plan at this point
       this.logger.debug(`Creating successful payment for plan: ${payment.planId}`);
 
-      const plan = await this.planService.activatePlan(payment.organizationId, payment.planId);
+      const plan = await this.planService.getPlanById(payment.organizationId, payment.planId);
       const org = await this.organizationService.getOrganization(payment.organizationId);
       const paidTill = addMonths(plan.paidTill, 1);
       await this.planService.updatePlan(payment.planId, { paidTill });
@@ -214,7 +214,6 @@ export class BillingService {
     const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
     const days = org?.config?.topUpDays ?? 31;
     const config = calculateDepthAndAmount(days, requestedGbs);
-    // todo dev mode set fix depth
     const amount = config.amount.toFixed(0);
     await this.tryTopUp(org, amount, days);
   }
@@ -223,10 +222,11 @@ export class BillingService {
     try {
       this.logger.info(`Performing topUp on ${org.postageBatchId} with amount: ${amount}. (days: ${days})`);
       await this.beeService.topUp(org.postageBatchId, amount);
+      return true;
     } catch (e) {
-      this.logger.error(e, `TopUp operation failed. Skipping diluting. Org: ${org._id}`);
+      this.logger.error(e, `TopUp operation failed. Org: ${org._id}`);
       await this.organizationService.update(org._id.toString(), { postageBatchStatus: 'FAILED_TO_TOP_UP' });
-      return;
+      return false;
     }
   }
 
@@ -238,9 +238,12 @@ export class BillingService {
     const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
     const days = org?.config?.topUpDays ?? 31;
     const config = calculateDepthAndAmount(days, requestedGbs);
-    // todo dev mode set fix depth
     const amount = config.amount.toFixed(0);
-    this.tryTopUp(org, amount, days);
+    const success: boolean = await this.tryTopUp(org, amount, days);
+    if (!success) {
+      this.logger.error(`TopUp operation failed. Skipping diluting. Org: ${org._id}`);
+      return;
+    }
     try {
       await this.beeService.dilute(org.postageBatchId, config.depth);
     } catch (e) {
