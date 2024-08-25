@@ -34,9 +34,11 @@ export class FileReferenceService {
   }
 
   async getFileReferences(organizationId: string): Promise<FileReference[]> {
-    return (await this.fileReferenceModel.find({
-      organizationId,
-    })) as FileReference[];
+    return (await this.fileReferenceModel
+      .find({
+        organizationId,
+      })
+      .sort([['_id', -1]])) as FileReference[];
   }
 
   async getFileReference(org: Organization, hash: string) {
