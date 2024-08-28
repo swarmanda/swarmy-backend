@@ -1,4 +1,4 @@
 export interface StartSubscriptionDto {
-  uploadSizeLimit: number
-  downloadSizeLimit: number
+  uploadSizeLimit: number;
+  downloadSizeLimit: number;
 }
