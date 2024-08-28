@@ -49,7 +49,7 @@ export function calculateDepthAndAmount(days: number, gbs: number) {
   const amount = days * oneDay;
   const depth = getDepthForRequestedStorage(gbs);
   const bzzPriceTimes100 = (2n ** BigInt(depth) * BigInt(amount)) / 100000000000000n;
-  const bzzPrice = (Number(bzzPriceTimes100) / 100).toFixed(2);
+  const bzzPrice = Number(bzzPriceTimes100) / 100;
   return { amount, depth, bzzPrice };
 }
 

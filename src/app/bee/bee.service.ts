@@ -1,4 +1,4 @@
-import { BatchId, Bee, Data, FileData } from '@ethersphere/bee-js';
+import { BatchId, Bee, BeeModes, Data, FileData } from '@ethersphere/bee-js';
 import { Injectable } from '@nestjs/common';
 import { Readable } from 'stream';
 import { ConfigService } from '@nestjs/config';
@@ -13,7 +13,7 @@ export class BeeService {
     private readonly logger: PinoLogger,
     configService: ConfigService,
   ) {
-    this.bee = new Bee(configService.get<string>('BEE_URL'));
+    this.bee = new Bee(configService.get<string>('BEE_URL'), { timeout: 1000 });
   }
 
   async download(hash: string, path?: string): Promise<FileData<Data>> {
@@ -39,6 +39,15 @@ export class BeeService {
     return await this.bee.getWalletBalance();
   }
 
+  async getWalletBzzBalance() {
+    if (await this.isDev()) {
+      return 99999999;
+    }
+    const wallet = await this.getWallet();
+    const bzzBalanceTimes100 = BigInt(wallet.bzzBalance) / 100000000000000n;
+    return Number(bzzBalanceTimes100) / 100;
+  }
+
   async getPostageBatch(postageBatchId: string) {
     return await this.bee.getPostageBatch(postageBatchId);
   }
@@ -49,10 +58,23 @@ export class BeeService {
 
   async dilute(postageBatchId: string, depth: number) {
     this.logger.info(`Performing dilute on ${postageBatchId} with depth: ${depth}`);
-    return await this.bee.diluteBatch(postageBatchId, depth);
+    if (await this.isDev()) {
+      this.logger.info(`Skipping dilute because bee is running in dev mode`);
+    } else {
+      return await this.bee.diluteBatch(postageBatchId, depth);
+    }
   }
 
   async topUp(postageBatchId: string, amount: string) {
-    return await this.bee.topUpBatch(postageBatchId, amount);
+    if (await this.isDev()) {
+      this.logger.info(`Skipping topUp because bee is running in dev mode`);
+    } else {
+      return await this.bee.topUpBatch(postageBatchId, amount);
+    }
+  }
+
+  async isDev() {
+    const info = await this.bee.getNodeInfo();
+    return info.beeMode === BeeModes.DEV;
   }
 }

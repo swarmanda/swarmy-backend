@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PlanService } from '../plan/plan.service';
 import { StripeService } from '../payment/stripe.service';
 import { User } from '../user/user.schema';
@@ -13,6 +13,8 @@ import { UsageMetricsService } from '../data/usage-metrics.service';
 import { Plan } from '../plan/plan.schema';
 import { Organization } from '../organization/organization.schema';
 import { addMonths } from 'date-fns';
+
+const DAYS_TO_PURCHASE_POSTAGE_BATCH = 35;
 
 @Injectable()
 export class BillingService {
@@ -60,6 +62,7 @@ export class BillingService {
     const selectedBandwidthOption = subscriptionConfig.bandwidth.options.find(
       (o) => o.size === payload.downloadSizeLimit,
     );
+    await this.verifyWalletBalance(DAYS_TO_PURCHASE_POSTAGE_BATCH, selectedStorageOption.size);
 
     if (!selectedStorageOption || !selectedBandwidthOption) {
       this.logger.error('Invalid pricing provided %o', payload);
@@ -100,6 +103,18 @@ export class BillingService {
     //todo add scheduled that closes payments after x hours, cleans up unpaid plans
 
     return result;
+  }
+
+  private async verifyWalletBalance(days: number, gbs: number) {
+    const bzzBalance = await this.beeService.getWalletBzzBalance();
+    const result = calculateDepthAndAmount(days, gbs);
+
+    if (bzzBalance <= result.bzzPrice) {
+      this.logger.error(
+        `Can't initialize subscription. Wallet balance is insufficient. Available: ${bzzBalance} Required: ${result.bzzPrice}`,
+      );
+      throw new InternalServerErrorException('internal issue');
+    }
   }
 
   private async handleCheckoutSessionCompleted(merchantTransactionId: string, stripeCustomerId: string) {
@@ -193,7 +208,7 @@ export class BillingService {
     try {
       const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
       // top up for 35 days for tolerating late recurring payments
-      const days = org?.config?.topUpDays ?? 35;
+      const days = org?.config?.topUpDays ?? DAYS_TO_PURCHASE_POSTAGE_BATCH;
       const config = calculateDepthAndAmount(days, requestedGbs);
       this.logger.info(
         `Creating postage batch. Amount: ${config.amount}, depth: ${config.depth}, cost: BZZ ${config.bzzPrice}`,
@@ -222,6 +237,7 @@ export class BillingService {
     try {
       this.logger.info(`Performing topUp on ${org.postageBatchId} with amount: ${amount}. (days: ${days})`);
       await this.beeService.topUp(org.postageBatchId, amount);
+      this.logger.info(`TopUp completed successfully on ${org.postageBatchId} with amount: ${amount}. (days: ${days})`);
       return true;
     } catch (e) {
       this.logger.error(e, `TopUp operation failed. Org: ${org._id}`);
@@ -246,6 +262,7 @@ export class BillingService {
     }
     try {
       await this.beeService.dilute(org.postageBatchId, config.depth);
+      this.logger.info(`Dilute successful dilute on ${org.postageBatchId} with depth: ${config.depth}`);
     } catch (e) {
       this.logger.error(e, `Dilute operation failed. Org: ${org._id}`);
       await this.organizationService.update(org._id.toString(), { postageBatchStatus: 'FAILED_TO_DILUTE' });
