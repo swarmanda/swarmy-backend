@@ -6,6 +6,7 @@ import {
   Param,
   ParseFilePipe,
   Post,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -67,10 +68,9 @@ export class DataController {
       }),
     )
     file: Express.Multer.File,
-    @Body() body: unknown,
+    @Query('website') website: boolean,
   ): UploadResultDto {
-    console.log(body);
-    return this.uploadService.uploadFile(org, file);
+    return this.uploadService.uploadFile(org, file, website);
   }
 
   @Public()
