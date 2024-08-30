@@ -13,7 +13,7 @@ export class BeeService {
     private readonly logger: PinoLogger,
     configService: ConfigService,
   ) {
-    this.bee = new Bee(configService.get<string>('BEE_URL'), { timeout: 1000 });
+    this.bee = new Bee(configService.get<string>('BEE_URL'));
   }
 
   async download(hash: string, path?: string): Promise<FileData<Data>> {
