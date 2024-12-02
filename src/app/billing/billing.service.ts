@@ -132,12 +132,12 @@ export class BillingService {
     const orgId = org._id.toString();
     const planIdToActivate = payment.planId;
 
-    // todo validate status
     const planToActivate = await this.planService.getPlanById(orgId, planIdToActivate);
     if (planToActivate.status !== 'PENDING_PAYMENT') {
       this.logger.error(
         `Status of plan to activate must be PENDING_PAYMENT, but it's ${planToActivate.status}. Plan: ${planIdToActivate}`,
       );
+      return;
     }
     const activePlan = await this.planService.getActivePlanForOrganization(orgId);
     if (activePlan) {
