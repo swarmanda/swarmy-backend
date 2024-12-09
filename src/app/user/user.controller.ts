@@ -1,25 +1,24 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { RegisterUserDto } from './register-user.dto';
-import { UserService } from './user.service';
+import { OrganizationsRow, UsersRow } from 'src/DatabaseExtra';
 import { Public } from '../auth/public.decorator';
-import { UserInContext } from './user.decorator';
-import { User } from './user.schema';
 import { OrganizationInContext } from '../organization/organization.decorator';
-import { Organization } from '../organization/organization.schema';
-import { VerifyEmailDto } from './verify-email.dto';
+import { RegisterUserDto } from './register-user.dto';
 import { ResetPasswordDto } from './reset-password.dto';
 import { SendPasswordResetDto } from './send-password-reset.dto';
+import { UserInContext } from './user.decorator';
+import { UserService } from './user.service';
+import { VerifyEmailDto } from './verify-email.dto';
 
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('/me')
-  getUser(@UserInContext() user: User, @OrganizationInContext() org: Organization) {
+  getUser(@UserInContext() user: UsersRow, @OrganizationInContext() organization: OrganizationsRow) {
     return {
       email: user.email,
-      organizationId: org._id,
-      postageBatchStatus: org.postageBatchStatus,
+      organizationId: organization.id,
+      postageBatchStatus: organization.postageBatchStatus,
       emailVerified: user.emailVerified,
     };
   }
@@ -37,7 +36,7 @@ export class UserController {
   }
 
   @Post('/resend-email-verification-by-user')
-  async resendEmailVerificationByUser(@UserInContext() user: User) {
+  async resendEmailVerificationByUser(@UserInContext() user: UsersRow) {
     await this.userService.resendEmailVerification(user, null);
   }
 

@@ -1,14 +1,19 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { RegisterUserDto } from './register-user.dto';
-import { InjectModel } from '@nestjs/mongoose';
-import { User } from './user.schema';
-import { Model } from 'mongoose';
-import * as bcrypt from 'bcrypt';
-import { OrganizationService } from '../organization/organization.service';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { EmailService } from '../email/email.service';
-import { ConfigService } from '@nestjs/config';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
+import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
+import { Types } from 'cafe-utility';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import {
+  getOnlyUsersRowOrNull,
+  getOnlyUsersRowOrThrow,
+  insertUsersRow,
+  updateUsersRow,
+  UsersRow,
+} from 'src/DatabaseExtra';
+import { EmailService } from '../email/email.service';
+import { OrganizationService } from '../organization/organization.service';
+import { RegisterUserDto } from './register-user.dto';
 
 @Injectable()
 export class UserService {
@@ -18,39 +23,32 @@ export class UserService {
     configService: ConfigService,
     @InjectPinoLogger(UserService.name)
     private readonly logger: PinoLogger,
-    @InjectModel(User.name) private userModel: Model<User>,
-    // private usageMetricsService: UsageMetricsService,
     private organizationService: OrganizationService,
     private emailService: EmailService,
   ) {
-    this.frontendUrl = configService.get<string>('FRONTEND_URL');
-    this.userModel.updateMany({}, { enabled: true });
-  }
-
-  async getUser(email: string): Promise<User> {
-    return this.userModel.findOne({ email });
+    this.frontendUrl = Types.asString(configService.get<string>('FRONTEND_URL'), { name: 'FRONTEND_URL' });
   }
 
   async createUser(registerUserDto: RegisterUserDto) {
     await this.verifyUniqueEmail(registerUserDto.email);
     const organization = await this.organizationService.create(`${registerUserDto.email}'s organization`);
 
-    const savedUser = await new this.userModel({
+    const emailVerificationCode = this.generateRandomTokenWithTimestamp();
+
+    await insertUsersRow({
       email: registerUserDto.email,
       password: await this.hash(registerUserDto.password),
-      organizationId: organization._id,
-      emailVerified: false,
-      emailVerificationCode: this.generateRandomTokenWithTimestamp(),
-      enabled: true,
-    }).save();
-    this.logger.info('User created: %s', savedUser.email);
+      organizationId: organization.id,
+      emailVerificationCode,
+    });
+    this.logger.info('User created: %s', registerUserDto.email);
 
-    const verificationUrl = this.getVerificationUrl(savedUser.emailVerificationCode);
-    await this.emailService.sendEmailVerification(savedUser.email, verificationUrl);
+    const verificationUrl = this.getVerificationUrl(emailVerificationCode);
+    await this.emailService.sendEmailVerification(registerUserDto.email, verificationUrl);
   }
 
   private async verifyUniqueEmail(email: string) {
-    const user = await this.getUser(email);
+    const user = await getOnlyUsersRowOrNull({ email });
     if (user) {
       throw new ConflictException();
     }
@@ -61,20 +59,21 @@ export class UserService {
     return await bcrypt.hash(password, saltOrRounds);
   }
 
-  async resendEmailVerification(user: User, code: string) {
+  async resendEmailVerification(user?: UsersRow | null, code?: string | null) {
+    if (!user && !code) {
+      throw new BadRequestException();
+    }
+    if (!user && code) {
+      user = await getOnlyUsersRowOrThrow({ emailVerificationCode: code });
+    }
     if (!user) {
-      user = await this.userModel.findOne({ emailVerificationCode: code });
+      throw new BadRequestException();
     }
 
     this.verifyEmailVerificationCanBeSent(user);
 
     const newCode = this.generateRandomTokenWithTimestamp();
-    await this.userModel.findOneAndUpdate(
-      { _id: user._id },
-      {
-        emailVerificationCode: newCode,
-      },
-    );
+    await updateUsersRow(user.id, { emailVerificationCode: newCode });
     const verificationUrl = this.getVerificationUrl(newCode);
     await this.emailService.sendEmailVerification(user.email, verificationUrl);
   }
@@ -83,9 +82,9 @@ export class UserService {
     return `${this.frontendUrl}/verify?c=${code}`;
   }
 
-  private verifyEmailVerificationCanBeSent(user: User) {
+  private verifyEmailVerificationCanBeSent(user: UsersRow) {
     if (!user) {
-      this.logger.debug(`Can't resent email verification code. User does not exist.'`);
+      this.logger.debug(`Can't resend email verification code. User does not exist.'`);
       throw new BadRequestException();
     }
     if (user.emailVerified) {
@@ -110,7 +109,7 @@ export class UserService {
   }
 
   async verifyEmail(code: string) {
-    const user = await this.userModel.findOne({ emailVerificationCode: code });
+    const user = await getOnlyUsersRowOrNull({ emailVerificationCode: code });
 
     if (!user) {
       this.logger.debug(`Can't verify user by code ${code}. User does not exist'`);
@@ -120,13 +119,8 @@ export class UserService {
       return;
     }
     this.checkVerificationCode(user.emailVerificationCode, code);
-    this.logger.info(`User email verification successful ${code} ${user._id}'`);
-    await this.userModel.findOneAndUpdate(
-      { _id: user._id },
-      {
-        emailVerified: true,
-      },
-    );
+    this.logger.info(`User email verification successful ${code} ${user.id}'`);
+    await updateUsersRow(user.id, { emailVerified: 1 });
   }
 
   private checkVerificationCode(emailVerificationCode: string, submittedCode: string) {
@@ -154,7 +148,7 @@ export class UserService {
   }
 
   async sendResetPasswordEmail(email: string) {
-    const user = await this.getUser(email);
+    const user = await getOnlyUsersRowOrNull({ email });
     if (!user) {
       this.logger.info(`Use does not exist with email ${email}, not sending password reset email.`);
       return;
@@ -167,12 +161,7 @@ export class UserService {
     }
 
     const token = this.generateRandomTokenWithTimestamp();
-    await this.userModel.findOneAndUpdate(
-      { _id: user._id },
-      {
-        resetPasswordToken: token,
-      },
-    );
+    await updateUsersRow(user.id, { resetPasswordToken: token });
 
     const resetUrl = `${this.frontendUrl}/reset-password?token=${token}`;
     await this.emailService.sendPasswordReset(resetUrl, email);
@@ -182,20 +171,14 @@ export class UserService {
     if (this.getElapsedSeconds(token) > 60 * 60) {
       throw new BadRequestException();
     }
-    const user = await this.userModel.findOne({ resetPasswordToken: token });
+    const user = await getOnlyUsersRowOrNull({ resetPasswordToken: token });
 
     if (!user) {
       this.logger.info(`Can't reset password by token ${token}. User does not exist.`);
       return;
     }
 
-    this.logger.info(`Resetting password for user ${user._id}`);
-    await this.userModel.findOneAndUpdate(
-      { _id: user._id },
-      {
-        password: await this.hash(password),
-        resetPasswordToken: null,
-      },
-    );
+    this.logger.info(`Resetting password for user ${user.id}`);
+    await updateUsersRow(user.id, { resetPasswordToken: null, password: await this.hash(password) });
   }
 }

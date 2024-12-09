@@ -1,11 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { UsageMetricsService } from './usage-metrics.service';
-import { FileReferenceService } from './file.service';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { FileReferencesRow, OrganizationsRow } from 'src/DatabaseExtra';
 import { BeeService } from '../bee/bee.service';
 import { DownloadResult } from './download-result';
-import { Organization } from '../organization/organization.schema';
-import { FileReference } from './file.schema';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { FileReferenceService } from './file.service';
+import { UsageMetricsService } from './usage-metrics.service';
 
 @Injectable()
 export class DownloadService {
@@ -17,44 +16,52 @@ export class DownloadService {
     private beeService: BeeService,
   ) {}
 
-  async download(org: Organization, hash: string, path?: string): Promise<DownloadResult> {
-    await this.verifyPostageBatch(org);
+  async download(organization: OrganizationsRow, hash: string, path?: string): Promise<DownloadResult> {
+    await this.verifyPostageBatch(organization);
 
-    const fileRef = await this.fileReferenceService.getFileReference(org, hash);
+    const fileRef = await this.fileReferenceService.getFileReference(organization, hash);
     if (!fileRef) {
       throw new NotFoundException();
     }
-    const metric = await this.validateDownloadLimit(org, fileRef);
+    const metric = await this.validateDownloadLimit(organization, fileRef);
     this.usageMetricsService.increment(metric, fileRef.size).catch((e) => {
       console.error('Failed to handle download event', e);
     });
     const result = await this.beeService.download(hash, path);
 
     this.logger.info('CONTENT TYPE:' + result.contentType);
+    const headers: Record<string, string> = {};
+    if (fileRef.isWebsite && result.contentType) {
+      headers['Content-Type'] = result.contentType;
+    }
+    if (!fileRef.isWebsite) {
+      headers['Content-Type'] = fileRef.contentType;
+      headers['Content-Disposition'] = `attachment; filename="${fileRef.name}"`;
+    }
     return {
-      headers: {
-        'Content-Type': fileRef.isWebsite ? result.contentType : fileRef.contentType,
-      },
+      headers,
       data: result.data,
     };
   }
 
-  private async verifyPostageBatch(org: Organization) {
-    if (!org.postageBatchId) {
-      this.logger.info(`Upload attempted org ${org._id} that doesn't have a postage batch`);
+  private async verifyPostageBatch(organization: OrganizationsRow) {
+    if (!organization.postageBatchId) {
+      this.logger.info(`Upload attempted org ${organization.id} that doesn't have a postage batch`);
       throw new BadRequestException();
     }
-    const batch = await this.beeService.getPostageBatch(org.postageBatchId);
+    const batch = await this.beeService.getPostageBatch(organization.postageBatchId);
     if (!batch) {
-      this.logger.error(`Download attempted with postage batch id ${org.postageBatchId} that doesn't exist on bee`);
+      this.logger.error(
+        `Download attempted with postage batch id ${organization.postageBatchId} that doesn't exist on bee`,
+      );
       throw new BadRequestException();
     }
   }
 
-  private async validateDownloadLimit(org: Organization, fileRef: FileReference) {
-    const metric = await this.usageMetricsService.getForOrganization(org._id.toString(), 'DOWNLOADED_BYTES');
+  private async validateDownloadLimit(organization: OrganizationsRow, fileReference: FileReferencesRow) {
+    const metric = await this.usageMetricsService.getForOrganization(organization.id, 'DOWNLOADED_BYTES');
     const remaining = metric.available - metric.used;
-    if (remaining < fileRef.size) {
+    if (remaining < fileReference.size) {
       throw new UnprocessableEntityException(`Download limit reached.`);
     }
     return metric;

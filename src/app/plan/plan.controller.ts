@@ -1,8 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
-import { PlanService } from './plan.service';
+import { UsersRow } from 'src/DatabaseExtra';
 import { Public } from '../auth/public.decorator';
 import { UserInContext } from '../user/user.decorator';
-import { User } from '../user/user.schema';
+import { PlanService } from './plan.service';
 import { subscriptionConfig } from './subscriptions';
 
 @Controller('plans')
@@ -16,7 +16,7 @@ export class PlanController {
   }
 
   @Get('/active')
-  async getPlan(@UserInContext() user: User) {
+  async getPlan(@UserInContext() user: UsersRow) {
     const result = await this.planService.getActivePlanForOrganization(user.organizationId);
     return (
       result || {

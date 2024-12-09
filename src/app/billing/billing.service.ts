@@ -1,18 +1,27 @@
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
-import { PlanService } from '../plan/plan.service';
-import { StripeService } from '../payment/stripe.service';
-import { User } from '../user/user.schema';
+import { addMonths } from 'date-fns';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import {
+  getOnlyPlansRowOrThrow,
+  insertPaymentsRow,
+  insertPlansRow,
+  OrganizationsRow,
+  PlansRow,
+  updateOrganizationsRow,
+  updatePaymentsRow,
+  updatePlansRow,
+  UsersRow,
+} from 'src/DatabaseExtra';
+import Stripe from 'stripe';
+import { AlertService } from '../alert/alert.service';
 import { BeeService } from '../bee/bee.service';
+import { UsageMetricsService } from '../data/usage-metrics.service';
 import { OrganizationService } from '../organization/organization.service';
 import { PaymentService } from '../payment/payment.service';
-import Stripe from 'stripe';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { StartSubscriptionDto } from './start-subscription.dto';
+import { StripeService } from '../payment/stripe.service';
+import { PlanService } from '../plan/plan.service';
 import { calculateDepthAndAmount, subscriptionConfig } from '../plan/subscriptions';
-import { UsageMetricsService } from '../data/usage-metrics.service';
-import { Plan } from '../plan/plan.schema';
-import { Organization } from '../organization/organization.schema';
-import { addMonths } from 'date-fns';
+import { StartSubscriptionDto } from './start-subscription.dto';
 
 const DAYS_TO_PURCHASE_POSTAGE_BATCH = 35;
 
@@ -21,6 +30,7 @@ export class BillingService {
   constructor(
     @InjectPinoLogger(BillingService.name)
     private readonly logger: PinoLogger,
+    private alertService: AlertService,
     private planService: PlanService,
     private stripeService: StripeService,
     private paymentService: PaymentService,
@@ -53,7 +63,7 @@ export class BillingService {
     // const merchantTransactionId = 'x';
   }
 
-  async initSubscriptionProcess(user: User, payload: StartSubscriptionDto) {
+  async initSubscriptionProcess(user: UsersRow, payload: StartSubscriptionDto) {
     //todo validate
 
     const selectedStorageOption = subscriptionConfig.storageCapacity.options.find(
@@ -62,12 +72,14 @@ export class BillingService {
     const selectedBandwidthOption = subscriptionConfig.bandwidth.options.find(
       (o) => o.size === payload.downloadSizeLimit,
     );
-    await this.verifyWalletBalance(DAYS_TO_PURCHASE_POSTAGE_BATCH, selectedStorageOption.size);
 
     if (!selectedStorageOption || !selectedBandwidthOption) {
       this.logger.error('Invalid pricing provided %o', payload);
       throw new BadRequestException('Invalid request');
     }
+
+    await this.verifyWalletBalance(DAYS_TO_PURCHASE_POSTAGE_BATCH, selectedStorageOption.size);
+
     const storageCapacity = selectedStorageOption.size;
     const bandwidth = selectedBandwidthOption.size;
     const storageAmount = storageCapacity * subscriptionConfig.storageCapacity.pricePerGb;
@@ -76,29 +88,21 @@ export class BillingService {
     const total = storageAmount + bandwidthAmount;
     const totalCents = Math.round((total + Number.EPSILON) * 100);
 
-    const plan = await this.planService.createPlan({
+    const planId = await insertPlansRow({
       organizationId: user.organizationId,
-      // name: template.name,
       amount: totalCents / 100,
       currency: subscriptionConfig.currency,
       frequency: 'MONTH',
-      quotas: {
-        uploadSizeLimit: storageCapacity * 1024 * 1024 * 1024,
-        downloadSizeLimit: bandwidth * 1024 * 1024 * 1024,
-        downloadCountLimit: 100_000,
-        uploadCountLimit: 100_000,
-      },
+      uploadSizeLimit: storageCapacity * 1024 * 1024 * 1024,
+      downloadSizeLimit: bandwidth * 1024 * 1024 * 1024,
+      downloadCountLimit: 100_000,
+      uploadCountLimit: 100_000,
+      status: 'PENDING_PAYMENT',
     });
+    const plan = await getOnlyPlansRowOrThrow({ id: planId });
 
-    this.logger.info(`Initializing payment. User: ${user._id} Amount: ${plan.amount} ${plan.currency}`);
-    const result = this.stripeService.initPayment(
-      user.organizationId,
-      plan._id.toString(),
-      user._id.toString(),
-      user.email,
-      totalCents,
-      plan.currency,
-    );
+    this.logger.info(`Initializing payment. User: ${user.id} Amount: ${plan.amount} ${plan.currency}`);
+    const result = this.stripeService.initPayment(user.organizationId, plan.id, user.email, totalCents, plan.currency);
 
     //todo add scheduled that closes payments after x hours, cleans up unpaid plans
 
@@ -110,10 +114,9 @@ export class BillingService {
     const result = calculateDepthAndAmount(days, gbs);
 
     if (bzzBalance <= result.bzzPrice) {
-      this.logger.error(
-        `Can't initialize subscription. Wallet balance is insufficient. Available: ${bzzBalance} Required: ${result.bzzPrice}`,
-      );
-      throw new InternalServerErrorException('internal issue');
+      const message = `Can't initialize subscription. Wallet balance is insufficient. Available: ${bzzBalance} Required: ${result.bzzPrice}`;
+      this.alertService.sendAlert(message);
+      throw new InternalServerErrorException(message);
     }
   }
 
@@ -126,49 +129,58 @@ export class BillingService {
     if (!payment) {
       throw new BadRequestException(`No payment found with id ${merchantTransactionId}`);
     }
-    await this.paymentService.updatePayment(payment._id.toString(), { status: 'SUCCESS' });
+    await updatePaymentsRow(payment.id, { status: 'SUCCESS' });
 
-    const org = await this.organizationService.getOrganization(payment.organizationId);
-    const orgId = org._id.toString();
+    const organization = await this.organizationService.getOrganization(payment.organizationId);
+    const organizationId = organization.id;
     const planIdToActivate = payment.planId;
 
-    const planToActivate = await this.planService.getPlanById(orgId, planIdToActivate);
+    const planToActivate = await this.planService.getPlanById(organizationId, planIdToActivate);
     if (planToActivate.status !== 'PENDING_PAYMENT') {
       this.logger.error(
         `Status of plan to activate must be PENDING_PAYMENT, but it's ${planToActivate.status}. Plan: ${planIdToActivate}`,
       );
       return;
     }
-    const activePlan = await this.planService.getActivePlanForOrganization(orgId);
+    const activePlan = await this.planService.getActivePlanForOrganization(organizationId);
     if (activePlan) {
       await this.upgradeExistingPlanAndMetrics(activePlan, planToActivate);
-      const newPlan = await this.activateNewPlan(orgId, planIdToActivate);
-      this.topUpAndDilute(org, newPlan);
+      const newPlan = await this.activateNewPlan(organizationId, planIdToActivate);
+      this.topUpAndDilute(organization, newPlan);
     } else {
-      const plan = await this.activateNewPlan(orgId, planIdToActivate);
-      this.buyPostageBatch(org, plan);
+      const plan = await this.activateNewPlan(organizationId, planIdToActivate);
+      this.buyPostageBatch(organization, plan);
     }
   }
 
-  private async upgradeExistingPlanAndMetrics(planToUpgrade: Plan, newPlan: Plan) {
-    this.logger.info(`Upgrading plan ${planToUpgrade._id}`);
-    await this.planService.updatePlan(planToUpgrade._id.toString(), {
+  private async upgradeExistingPlanAndMetrics(planToUpgrade: PlansRow, newPlan: PlansRow) {
+    this.logger.info(`Upgrading plan ${planToUpgrade.id}`);
+    updatePlansRow(planToUpgrade.id, {
       status: 'CANCELLED',
-      statusReason: `UPGRADED_TO: ${newPlan._id}`,
+      statusReason: `UPGRADED_TO: ${newPlan.id}`,
     });
-    await this.usageMetricsService.upgradeCurrentMetrics(planToUpgrade.organizationId, newPlan.quotas);
+    await this.usageMetricsService.upgradeCurrentMetrics(
+      planToUpgrade.organizationId,
+      newPlan.uploadSizeLimit,
+      newPlan.downloadSizeLimit,
+    );
   }
 
-  private async activateNewPlan(organizationId: string, planId: string) {
+  private async activateNewPlan(organizationId: number, planId: number) {
     this.logger.info(`Activating plan: ${planId}`);
     const plan = await this.planService.activatePlan(organizationId, planId);
-    await this.usageMetricsService.upgradeCurrentMetrics(organizationId, plan.quotas);
+    await this.usageMetricsService.upgradeCurrentMetrics(organizationId, plan.uploadSizeLimit, plan.downloadSizeLimit);
     return plan;
   }
 
   private async handleInvoicePaid(object: Stripe.Invoice) {
     console.log(object);
-    const merchantTransactionId = object.subscription_details.metadata.client_reference_id;
+    const merchantTransactionId = object?.subscription_details?.metadata?.client_reference_id;
+    if (!merchantTransactionId) {
+      const message = 'No merchantTransactionId found in invoicePaid event.';
+      this.alertService.sendAlert(message);
+      throw new InternalServerErrorException(message);
+    }
     this.logger.info(`Processing invoicePaid for merchantTransactionId: ${merchantTransactionId}`);
 
     // initial payment
@@ -182,90 +194,105 @@ export class BillingService {
       this.logger.debug(`Creating successful payment for plan: ${payment.planId}`);
 
       const plan = await this.planService.getPlanById(payment.organizationId, payment.planId);
-      const org = await this.organizationService.getOrganization(payment.organizationId);
-      const paidTill = addMonths(plan.paidTill, 1);
-      await this.planService.updatePlan(payment.planId, { paidTill });
-      await this.paymentService.createPayment({
+      const organization = await this.organizationService.getOrganization(payment.organizationId);
+      if (!plan.paidUntil) {
+        const message = `Plan ${plan.id} has no paidUntil date.`;
+        this.alertService.sendAlert(message);
+        throw new InternalServerErrorException(message);
+      }
+      const paidUntil = addMonths(plan.paidUntil, 1);
+      await updatePlansRow(plan.id, { paidUntil });
+      await insertPaymentsRow({
         amount: object.amount_paid,
         currency: object.currency,
         planId: payment.planId,
         organizationId: payment.organizationId,
         status: 'SUCCESS',
+        merchantTransactionId,
       });
-      this.topUp(org, plan);
+      this.topUp(organization, plan);
     }
   }
 
-  async cancelPlan(org: Organization) {
-    this.logger.info(`Cancelling plan for organization ${org._id}.`);
-    const plan = await this.planService.scheduleActivePlanForCancellation(org._id.toString());
+  async cancelPlan(organization: OrganizationsRow) {
+    this.logger.info(`Cancelling plan for organization ${organization.id}.`);
+    await this.planService.scheduleActivePlanForCancellation(organization.id);
     // todo cancel stripe subscription
   }
 
-  private async buyPostageBatch(org: Organization, plan: Plan) {
-    const organizationId = org._id.toString();
-    await this.organizationService.update(organizationId, { postageBatchStatus: 'CREATING' });
+  private async buyPostageBatch(organization: OrganizationsRow, plan: PlansRow) {
+    const organizationId = organization.id;
+    await updateOrganizationsRow(organizationId, { postageBatchStatus: 'CREATING' });
     try {
-      const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
+      const requestedGbs = plan.uploadSizeLimit / 1024 / 1024 / 1024;
       // top up for 35 days for tolerating late recurring payments
-      const days = org?.config?.topUpDays ?? DAYS_TO_PURCHASE_POSTAGE_BATCH;
+      const days = DAYS_TO_PURCHASE_POSTAGE_BATCH;
       const config = calculateDepthAndAmount(days, requestedGbs);
       this.logger.info(
         `Creating postage batch. Amount: ${config.amount}, depth: ${config.depth}, cost: BZZ ${config.bzzPrice}`,
       );
       const batchId = await this.beeService.createPostageBatch(config.amount.toFixed(0), config.depth);
       this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
-      await this.organizationService.update(organizationId, {
-        postageBatchId: batchId,
-        postageBatchStatus: 'CREATED',
-      });
+      await updateOrganizationsRow(organizationId, { postageBatchId: batchId, postageBatchStatus: 'CREATED' });
     } catch (e) {
       this.logger.error(e, `Failed to buy postage batch for organization ${organizationId}`);
-      await this.organizationService.update(organizationId, { postageBatchStatus: 'FAILED_TO_CREATE' });
+      await updateOrganizationsRow(organizationId, { postageBatchStatus: 'FAILED_TO_CREATE' });
     }
   }
 
-  private async topUp(org: Organization, plan: Plan) {
-    const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-    const days = org?.config?.topUpDays ?? 31;
+  private async topUp(organization: OrganizationsRow, plan: PlansRow) {
+    const requestedGbs = plan.uploadSizeLimit / 1024 / 1024 / 1024;
+    const days = 31;
     const config = calculateDepthAndAmount(days, requestedGbs);
     const amount = config.amount.toFixed(0);
-    await this.tryTopUp(org, amount, days);
+    await this.tryTopUp(organization, amount, days);
   }
 
-  private async tryTopUp(org: Organization, amount: string, days: number) {
+  private async tryTopUp(organization: OrganizationsRow, amount: string, days: number) {
+    if (!organization.postageBatchId) {
+      const message = `Organization ${organization.id} has no postage batch id. Failing top up.`;
+      this.alertService.sendAlert(message);
+      throw new InternalServerErrorException(message);
+    }
     try {
-      this.logger.info(`Performing topUp on ${org.postageBatchId} with amount: ${amount}. (days: ${days})`);
-      await this.beeService.topUp(org.postageBatchId, amount);
-      this.logger.info(`TopUp completed successfully on ${org.postageBatchId} with amount: ${amount}. (days: ${days})`);
+      this.logger.info(`Performing topUp on ${organization.postageBatchId} with amount: ${amount}. (days: ${days})`);
+      await this.beeService.topUp(organization.postageBatchId, amount);
+      this.logger.info(
+        `TopUp completed successfully on ${organization.postageBatchId} with amount: ${amount}. (days: ${days})`,
+      );
       return true;
     } catch (e) {
-      this.logger.error(e, `TopUp operation failed. Org: ${org._id}`);
-      await this.organizationService.update(org._id.toString(), { postageBatchStatus: 'FAILED_TO_TOP_UP' });
+      this.logger.error(e, `TopUp operation failed. Org: ${organization.id}`);
+      await updateOrganizationsRow(organization.id, { postageBatchStatus: 'FAILED_TO_TOP_UP' });
       return false;
     }
   }
 
-  private async topUpAndDilute(org: Organization, plan: Plan) {
+  private async topUpAndDilute(organization: OrganizationsRow, plan: PlansRow) {
+    if (!organization.postageBatchId) {
+      const message = `Organization ${organization.id} has no postage batch id. Failing top up and dilute.`;
+      this.alertService.sendAlert(message);
+      throw new InternalServerErrorException(message);
+    }
     //todo calculate minimum required top up amount
     //todo check if dilute is needed
     //todo store amount and depth?
 
-    const requestedGbs = plan.quotas.uploadSizeLimit / 1024 / 1024 / 1024;
-    const days = org?.config?.topUpDays ?? 31;
+    const requestedGbs = plan.uploadSizeLimit / 1024 / 1024 / 1024;
+    const days = 31;
     const config = calculateDepthAndAmount(days, requestedGbs);
     const amount = config.amount.toFixed(0);
-    const success: boolean = await this.tryTopUp(org, amount, days);
+    const success: boolean = await this.tryTopUp(organization, amount, days);
     if (!success) {
-      this.logger.error(`TopUp operation failed. Skipping diluting. Org: ${org._id}`);
+      this.logger.error(`TopUp operation failed. Skipping diluting. Org: ${organization.id}`);
       return;
     }
     try {
-      await this.beeService.dilute(org.postageBatchId, config.depth);
-      this.logger.info(`Dilute successful dilute on ${org.postageBatchId} with depth: ${config.depth}`);
+      await this.beeService.dilute(organization.postageBatchId, config.depth);
+      this.logger.info(`Dilute successful dilute on ${organization.postageBatchId} with depth: ${config.depth}`);
     } catch (e) {
-      this.logger.error(e, `Dilute operation failed. Org: ${org._id}`);
-      await this.organizationService.update(org._id.toString(), { postageBatchStatus: 'FAILED_TO_DILUTE' });
+      this.logger.error(e, `Dilute operation failed. Org: ${organization.id}`);
+      await updateOrganizationsRow(organization.id, { postageBatchStatus: 'FAILED_TO_DILUTE' });
     }
   }
 }
