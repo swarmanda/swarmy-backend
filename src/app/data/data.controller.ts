@@ -15,19 +15,18 @@ import {
 } from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UploadResultDto } from './upload.result.dto';
-import { UploadService } from './upload.service';
-import { UserInContext } from '../user/user.decorator';
-import { User } from '../user/user.schema';
-import { FileReferenceService } from './file.service';
-import { DownloadService } from './download.service';
-import { ApiKeyGuard } from '../api-key/api-key.guard';
-import { Public } from '../auth/public.decorator';
-import { UsageMetricsService } from './usage-metrics.service';
 import { Request, Response } from 'express';
 import { Buffer } from 'safe-buffer';
+import { OrganizationsRow, UsersRow } from 'src/DatabaseExtra';
+import { ApiKeyGuard } from '../api-key/api-key.guard';
+import { Public } from '../auth/public.decorator';
 import { OrganizationInContext } from '../organization/organization.decorator';
-import { Organization } from '../organization/organization.schema';
+import { UserInContext } from '../user/user.decorator';
+import { DownloadService } from './download.service';
+import { FileReferenceService } from './file.service';
+import { UploadResultDto } from './upload.result.dto';
+import { UploadService } from './upload.service';
+import { UsageMetricsService } from './usage-metrics.service';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1gb
 
@@ -43,8 +42,7 @@ export class DataController {
   @Post('files')
   @UseInterceptors(FileInterceptor('file'))
   uploadFile(
-    @OrganizationInContext() org: Organization,
-    @UserInContext() user: User,
+    @OrganizationInContext() organization: OrganizationsRow,
     @UploadedFile(
       new ParseFilePipe({
         validators: [new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })],
@@ -53,7 +51,7 @@ export class DataController {
     file: Express.Multer.File,
     @Body() body: any,
   ): UploadResultDto {
-    return this.uploadService.uploadFile(org, file, body.website, user);
+    return this.uploadService.uploadFile(organization, file, body.website);
   }
 
   @Public()
@@ -61,7 +59,7 @@ export class DataController {
   @Post('api/files')
   @UseInterceptors(FileInterceptor('file'))
   uploadFileApi(
-    @OrganizationInContext() org: Organization,
+    @OrganizationInContext() organization: OrganizationsRow,
     @UploadedFile(
       new ParseFilePipe({
         validators: [new MaxFileSizeValidator({ maxSize: MAX_FILE_SIZE })],
@@ -70,14 +68,14 @@ export class DataController {
     file: Express.Multer.File,
     @Query('website') website: boolean,
   ): UploadResultDto {
-    return this.uploadService.uploadFile(org, file, website);
+    return this.uploadService.uploadFile(organization, file, website);
   }
 
   @Public()
   @UseGuards(ApiKeyGuard)
   @Get('api/files')
-  async getFileList(@OrganizationInContext() org: Organization) {
-    const result = await this.fileReferenceService.getFileReferences(org._id.toString());
+  async getFileList(@OrganizationInContext() organization: OrganizationsRow) {
+    const result = await this.fileReferenceService.getFileReferences(organization.id);
     return result.map((f) => ({
       hash: f.hash,
       name: f.name,
@@ -92,12 +90,12 @@ export class DataController {
   @UseGuards(ApiKeyGuard)
   @Get('files/:hash')
   async downloadFile(
-    @OrganizationInContext() org: Organization,
+    @OrganizationInContext() organization: OrganizationsRow,
     @Param('hash') hash: string,
     @Res() response: Response,
     @Req() request: Request,
   ) {
-    const result = await this.downloadService.download(org, hash);
+    const result = await this.downloadService.download(organization, hash);
     for (const key in result.headers) {
       response.header(key, result.headers[key]);
     }
@@ -109,14 +107,14 @@ export class DataController {
   @UseGuards(ApiKeyGuard)
   @Get('files/:hash/*')
   async downloadEmbeddedFile(
-    @OrganizationInContext() org: Organization,
+    @OrganizationInContext() organization: OrganizationsRow,
     @Param('hash') hash: string,
     @Res() response: Response,
     @Req() request: Request,
   ) {
     try {
       const path = request.path.split(hash)[1];
-      const result = await this.downloadService.download(org, hash, path);
+      const result = await this.downloadService.download(organization, hash, path);
       for (const key in result.headers) {
         response.header(key, result.headers[key]);
       }
@@ -127,12 +125,12 @@ export class DataController {
   }
 
   @Get('file-references')
-  getFileReferencesForUser(@UserInContext() user: User) {
+  getFileReferencesForUser(@UserInContext() user: UsersRow) {
     return this.fileReferenceService.getFileReferences(user.organizationId);
   }
 
   @Get('usage-metrics')
-  getUsageMetricsForOrganization(@UserInContext() user: User) {
+  getUsageMetricsForOrganization(@UserInContext() user: UsersRow) {
     return this.usageMetricsService.getAllForOrganization(user.organizationId);
   }
 }

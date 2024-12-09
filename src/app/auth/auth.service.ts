@@ -1,9 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { UserService } from '../user/user.service';
-import * as bcrypt from 'bcrypt';
-import { OrganizationService } from '../organization/organization.service';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { Types } from 'cafe-utility';
+import { getOnlyUsersRowOrNull } from 'src/DatabaseExtra';
+import { OrganizationService } from '../organization/organization.service';
 
 @Injectable()
 export class AuthService {
@@ -11,15 +12,14 @@ export class AuthService {
 
   constructor(
     configService: ConfigService,
-    private userService: UserService,
     private organizationService: OrganizationService,
     private jwtService: JwtService,
   ) {
-    this.jwtSecret = configService.get<string>('JWT_SECRET');
+    this.jwtSecret = Types.asString(configService.get<string>('JWT_SECRET'), { name: 'JWT_SECRET' });
   }
 
   async login(email: string, password: string): Promise<{ access_token: string }> {
-    const user = await this.userService.getUser(email);
+    const user = await getOnlyUsersRowOrNull({ email });
     if (!user || !user.enabled) {
       throw new UnauthorizedException();
     }

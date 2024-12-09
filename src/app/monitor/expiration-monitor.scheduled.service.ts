@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { Interval } from '@nestjs/schedule';
-import { PlanService } from '../plan/plan.service';
-import { OrganizationService } from '../organization/organization.service';
-import { Organization } from '../organization/organization.schema';
-import { BeeService } from '../bee/bee.service';
 import { PostageBatch } from '@ethersphere/bee-js';
+import { Injectable } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { getPlansRows, OrganizationsRow } from 'src/DatabaseExtra';
+import { BeeService } from '../bee/bee.service';
+import { OrganizationService } from '../organization/organization.service';
 
 const THIRTY_MINUTES = 30 * 60 * 1000;
 
@@ -15,13 +14,12 @@ export class ExpirationMonitorScheduledService {
     @InjectPinoLogger(ExpirationMonitorScheduledService.name)
     private readonly logger: PinoLogger,
     private readonly beeService: BeeService,
-    private readonly planService: PlanService,
     private readonly organizationService: OrganizationService,
   ) {}
 
   @Interval(THIRTY_MINUTES)
   async checkPostageBatchTTL() {
-    const plans = await this.planService.getPlans({ status: 'ACTIVE' });
+    const plans = await getPlansRows({ status: 'ACTIVE' });
     const batches = await this.beeService.getAllPostageBatches();
     if (plans.length !== batches.length) {
       this.logger.warn(
@@ -34,10 +32,13 @@ export class ExpirationMonitorScheduledService {
     }
   }
 
-  private async checkTTL(org: Organization, batches: PostageBatch[]) {
-    const batch = batches.find((batch) => batch.batchID === org.postageBatchId);
+  private async checkTTL(organization: OrganizationsRow, batches: PostageBatch[]) {
+    const batch = batches.find((batch) => batch.batchID === organization.postageBatchId);
     if (!batch) {
-      this.logger.warn(`There is no batch with id on the bee instance. Org: ${org._id}, batchId:` + org.postageBatchId);
+      this.logger.warn(
+        `There is no batch with id on the bee instance. Org: ${organization.id}, batchId:` +
+          organization.postageBatchId,
+      );
       return;
     }
 

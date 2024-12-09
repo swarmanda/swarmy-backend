@@ -1,70 +1,44 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Plan } from './plan.schema';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { addMonths } from 'date-fns';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { getOnlyPlansRowOrThrow, PlansRow, updatePlansRow } from 'src/DatabaseExtra';
 
 @Injectable()
 export class PlanService {
   constructor(
     @InjectPinoLogger(PlanService.name)
     private readonly logger: PinoLogger,
-    @InjectModel(Plan.name) private planModel: Model<Plan>,
   ) {}
 
-  async createPlan(plan: Partial<Plan>): Promise<Plan> {
-    return (await new this.planModel({
-      ...plan,
-      status: 'PENDING_PAYMENT',
-    }).save()) as Plan;
+  async getActivePlanForOrganization(organizationId: number): Promise<PlansRow> {
+    return getOnlyPlansRowOrThrow({ organizationId, status: 'ACTIVE' });
   }
 
-  async getActivePlanForOrganization(organizationId: string): Promise<Plan> {
-    return (await this.planModel.findOne({
-      organizationId,
-      status: 'ACTIVE',
-    })) as Plan;
-  }
-
-  async activatePlan(organizationId: string, planId: string): Promise<Plan> {
+  async activatePlan(organizationId: number, planId: number): Promise<PlansRow> {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
     if (existingActivePlan) {
       this.logger.error(`Can't activate plan, there is already an active plan for this organization ${organizationId}`);
-      throw new BadRequestException('There is already an active plan for this organization', organizationId);
+      throw new BadRequestException('There is already an active plan for this organization', organizationId.toString());
     }
 
     const now = new Date();
-    const paidTill = addMonths(now, 1);
-    const plan = await this.updatePlan(planId, { status: 'ACTIVE', paidTill });
-    this.logger.info('Plan activated ', plan._id);
-    return plan;
+    const paidUntil = addMonths(now, 1);
+    await updatePlansRow(planId, { status: 'ACTIVE', paidUntil });
+    this.logger.info('Plan activated ', planId);
+    return getOnlyPlansRowOrThrow({ id: planId });
   }
 
-  async cancelPlan(orgId: string, planId: string) {
-    const plan = await this.getPlanById(orgId, planId);
-    return await this.updatePlan(plan._id.toString(), { status: 'CANCELLED' });
+  async cancelPlan(organizationId: number, planId: number) {
+    const plan = await this.getPlanById(organizationId, planId);
+    await updatePlansRow(plan.id, { status: 'CANCELLED' });
   }
 
-  async scheduleActivePlanForCancellation(organizationId: string) {
+  async scheduleActivePlanForCancellation(organizationId: number) {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
-    return await this.updatePlan(existingActivePlan._id.toString(), {
-      cancelAt: existingActivePlan.paidTill,
-    });
+    await updatePlansRow(existingActivePlan.id, { cancelAt: existingActivePlan.paidUntil });
   }
 
-  async updatePlan(_id: string, update: Partial<Plan>): Promise<Plan> {
-    return (await this.planModel.findOneAndUpdate({ _id }, update)) as Plan;
-  }
-
-  async getPlanById(organizationId: string, planId: string) {
-    return (await this.planModel.findOne({
-      organizationId,
-      _id: planId,
-    })) as Plan;
-  }
-
-  async getPlans(filter: Record<string, any>): Promise<Plan[]> {
-    return this.planModel.find(filter);
+  async getPlanById(organizationId: number, planId: number) {
+    return getOnlyPlansRowOrThrow({ organizationId, id: planId });
   }
 }

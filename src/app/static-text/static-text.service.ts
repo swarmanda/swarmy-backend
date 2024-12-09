@@ -1,16 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { StaticText } from './static-text.schema';
+import { getOnlyStaticTextsRowOrNull } from 'src/DatabaseExtra';
 
 @Injectable()
 export class StaticTextService {
-  constructor(@InjectModel(StaticText.name) private staticTextModel: Model<StaticText>) {}
+  constructor() {}
 
-  async getStaticText(key: string) {
-    const result = (await this.staticTextModel.findOne({
-      key,
-    })) as StaticText;
+  async getStaticText(label: string) {
+    const result = await getOnlyStaticTextsRowOrNull({ label });
 
     return result?.value || 'Not defined';
   }

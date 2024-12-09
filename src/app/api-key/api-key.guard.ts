@@ -1,8 +1,9 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
-import { ApiKeyService } from './api-key.service';
-import { OrganizationService } from '../organization/organization.service';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { ApiKeysRow, OrganizationsRow } from 'src/DatabaseExtra';
+import { OrganizationService } from '../organization/organization.service';
+import { ApiKeyService } from './api-key.service';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -20,12 +21,12 @@ export class ApiKeyGuard implements CanActivate {
     if (!token) {
       throw new UnauthorizedException();
     }
-    let apiKey = null;
-    let org = null;
+    let apiKey: ApiKeysRow | null = null;
+    let organization: OrganizationsRow | null = null;
     try {
       apiKey = await this.apiKeyService.getApiKeyBySecret(token);
       if (apiKey && apiKey.status === 'ACTIVE') {
-        org = await this.organizationService.getOrganization(apiKey.organizationId);
+        organization = await this.organizationService.getOrganization(apiKey.organizationId);
       }
     } catch (e) {
       this.logger.error(e, 'Failed to verify API key');
@@ -34,11 +35,11 @@ export class ApiKeyGuard implements CanActivate {
     if (!apiKey || apiKey.status !== 'ACTIVE') {
       throw new UnauthorizedException('API key is invalid');
     }
-    if (!org || !org.enabled) {
+    if (!organization || !organization.enabled) {
       throw new UnauthorizedException('You shall not pass');
     }
 
-    request['organization'] = org;
+    request['organization'] = organization;
     request['key'] = token;
     return true;
   }

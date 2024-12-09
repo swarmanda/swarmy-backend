@@ -1,37 +1,42 @@
 import { Injectable } from '@nestjs/common';
-import { ApiKey } from './api-key.schema';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import {
+  ApiKeysRow,
+  getApiKeysRows,
+  getOnlyApiKeysRowOrThrow,
+  insertApiKeysRow,
+  updateApiKeysRow,
+} from 'src/DatabaseExtra';
 
 @Injectable()
 export class ApiKeyService {
   constructor(
     @InjectPinoLogger(ApiKeyService.name)
     private readonly logger: PinoLogger,
-    @InjectModel(ApiKey.name) private apiKeyModel: Model<ApiKey>,
   ) {}
 
-  async createApiKey(organizationId: string): Promise<ApiKey> {
+  async createApiKey(organizationId: number): Promise<ApiKeysRow> {
     this.logger.info('creating api key for %s', organizationId);
 
-    return await new this.apiKeyModel({
-      key: randomStringGenerator(),
-      organizationId: organizationId,
+    const id = await insertApiKeysRow({
+      apiKey: randomStringGenerator(),
+      organizationId,
       status: 'ACTIVE',
-    }).save();
+    });
+    return getOnlyApiKeysRowOrThrow({ id });
   }
 
-  async getApiKeys(organizationId: string): Promise<ApiKey[]> {
-    return (await this.apiKeyModel.find({ organizationId })) as ApiKey[];
+  async getApiKeys(organizationId: number): Promise<ApiKeysRow[]> {
+    return getApiKeysRows({ organizationId });
   }
 
-  async getApiKeyBySecret(secret: string): Promise<ApiKey> {
-    return (await this.apiKeyModel.findOne({ key: secret })) as ApiKey;
+  async getApiKeyBySecret(secret: string): Promise<ApiKeysRow> {
+    return getOnlyApiKeysRowOrThrow({ apiKey: secret });
   }
 
-  async revokeApiKey(id: string): Promise<ApiKey> {
-    return this.apiKeyModel.findOneAndUpdate({ _id: id }, { status: 'REVOKED' });
+  async revokeApiKey(id: number): Promise<ApiKeysRow> {
+    await updateApiKeysRow(id, { status: 'REVOKED' });
+    return getOnlyApiKeysRowOrThrow({ id });
   }
 }
