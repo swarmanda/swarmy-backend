@@ -1,20 +1,18 @@
 import { Module } from '@nestjs/common';
-
-import { MongooseModule } from '@nestjs/mongoose';
-import { AuthModule } from './auth/auth.module';
-import { UserModule } from './user/user.module';
-import { DataModule } from './data/data.module';
-import { PlanModule } from './plan/plan.module';
-import { PaymentModule } from './payment/payment.module';
-import { BillingModule } from './billing/billing.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 import { v4 as uuidv4 } from 'uuid';
-import { HealthcheckModule } from './healthcheck/healthcheck.module';
-import { StaticTextModule } from './static-text/static-text.module';
+import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
+import { DataModule } from './data/data.module';
 import { EmailModule } from './email/email.module';
-import { ScheduleModule } from '@nestjs/schedule';
+import { HealthcheckModule } from './healthcheck/healthcheck.module';
 import { MonitorModule } from './monitor/monitor.module';
+import { PaymentModule } from './payment/payment.module';
+import { PlanModule } from './plan/plan.module';
+import { StaticTextModule } from './static-text/static-text.module';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -60,19 +58,6 @@ import { MonitorModule } from './monitor/monitor.module';
           },
         };
       },
-    }),
-
-    MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('DATABASE_URL'),
-        dbName: configService.get<string>('DATABASE_NAME'),
-        auth: {
-          password: configService.get<string>('DATABASE_PASSWORD'),
-          username: configService.get<string>('DATABASE_USERNAME'),
-        },
-      }),
     }),
   ],
   controllers: [],
