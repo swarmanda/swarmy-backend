@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, UnprocessableEntityException } from '@
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { OrganizationsRow } from 'src/DatabaseExtra';
 import { Readable } from 'stream';
+import { AlertService } from '../alert/alert.service';
 import { BeeService } from '../bee/bee.service';
 import { FileReferenceService } from './file.service';
 import { UploadResultDto } from './upload.result.dto';
@@ -17,6 +18,7 @@ export class UploadService {
     private usageMetricsService: UsageMetricsService,
     private fileReferenceService: FileReferenceService,
     private beeService: BeeService,
+    private alertService: AlertService,
   ) {}
 
   async uploadFile(
@@ -57,15 +59,17 @@ export class UploadService {
 
   private async verifyPostageBatch(organization: OrganizationsRow) {
     if (!organization.postageBatchId) {
-      this.logger.info(`Upload attempted org ${organization.id} that doesn't have a postage batch`);
+      const message = `Upload attempted org ${organization.id} that doesn't have a postage batch`;
+      this.logger.error(message);
+      this.alertService.sendAlert(message);
       throw new BadRequestException();
     }
     try {
       await this.beeService.getPostageBatch(organization.postageBatchId);
     } catch (e) {
-      this.logger.error(
-        `Upload attempted by org: ${organization.id} with postage batch ${organization.postageBatchId} that doesn't exist on bee`,
-      );
+      const message = `Upload attempted by org: ${organization.id} with postage batch ${organization.postageBatchId} that doesn't exist on bee`;
+      this.alertService.sendAlert(message, e);
+      this.logger.error(e, message);
       throw new BadRequestException();
     }
   }

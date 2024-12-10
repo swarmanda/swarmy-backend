@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { FileReferencesRow, OrganizationsRow } from 'src/DatabaseExtra';
+import { AlertService } from '../alert/alert.service';
 import { BeeService } from '../bee/bee.service';
 import { DownloadResult } from './download-result';
 import { FileReferenceService } from './file.service';
@@ -14,6 +15,7 @@ export class DownloadService {
     private usageMetricsService: UsageMetricsService,
     private fileReferenceService: FileReferenceService,
     private beeService: BeeService,
+    private alertService: AlertService,
   ) {}
 
   async download(organization: OrganizationsRow, hash: string, path?: string): Promise<DownloadResult> {
@@ -51,9 +53,9 @@ export class DownloadService {
     }
     const batch = await this.beeService.getPostageBatch(organization.postageBatchId);
     if (!batch) {
-      this.logger.error(
-        `Download attempted with postage batch id ${organization.postageBatchId} that doesn't exist on bee`,
-      );
+      const message = `Download attempted with postage batch id ${organization.postageBatchId} that doesn't exist on bee`;
+      this.alertService.sendAlert(message);
+      this.logger.error(message);
       throw new BadRequestException();
     }
   }

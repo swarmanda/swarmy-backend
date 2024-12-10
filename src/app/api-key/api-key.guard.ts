@@ -29,8 +29,9 @@ export class ApiKeyGuard implements CanActivate {
         organization = await this.organizationService.getOrganization(apiKey.organizationId);
       }
     } catch (e) {
-      this.logger.error(e, 'Failed to verify API key');
-      throw new UnauthorizedException('Failed to verify API key');
+      const message = 'Failed to verify API key';
+      this.logger.error(e, message);
+      throw new UnauthorizedException(message);
     }
     if (!apiKey || apiKey.status !== 'ACTIVE') {
       throw new UnauthorizedException('API key is invalid');

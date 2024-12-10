@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AlertModule } from '../alert/alert.module';
 import { PlanController } from './plan.controller';
 import { PlanService } from './plan.service';
 
@@ -6,5 +7,6 @@ import { PlanService } from './plan.service';
   controllers: [PlanController],
   providers: [PlanService],
   exports: [PlanService],
+  imports: [AlertModule],
 })
 export class PlanModule {}

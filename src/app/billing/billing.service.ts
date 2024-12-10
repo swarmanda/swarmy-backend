@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Strings } from 'cafe-utility';
 import { addMonths } from 'date-fns';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import {
@@ -76,8 +77,10 @@ export class BillingService {
     );
 
     if (!selectedStorageOption || !selectedBandwidthOption) {
-      this.logger.error('Invalid pricing provided %o', payload);
-      throw new BadRequestException('Invalid request');
+      const message = `Invalid pricing provided ${Strings.represent(payload)}`;
+      this.alertService.sendAlert(message);
+      this.logger.error(message);
+      throw new BadRequestException(message);
     }
 
     await this.verifyWalletBalance(DAYS_TO_PURCHASE_POSTAGE_BATCH, selectedStorageOption.size);
@@ -139,9 +142,9 @@ export class BillingService {
 
     const planToActivate = await this.planService.getPlanById(organizationId, planIdToActivate);
     if (planToActivate.status !== 'PENDING_PAYMENT') {
-      this.logger.error(
-        `Status of plan to activate must be PENDING_PAYMENT, but it's ${planToActivate.status}. Plan: ${planIdToActivate}`,
-      );
+      const message = `Status of plan to activate must be PENDING_PAYMENT, but it's ${planToActivate.status}. Plan: ${planIdToActivate}`;
+      this.alertService.sendAlert(message);
+      this.logger.error(message);
       return;
     }
     const activePlan = await this.planService.getActivePlanForOrganization(organizationId);
@@ -237,7 +240,9 @@ export class BillingService {
       this.logger.info(`Updating postback batch of organization ${organizationId} to ${batchId}`);
       await updateOrganizationsRow(organizationId, { postageBatchId: batchId, postageBatchStatus: 'CREATED' });
     } catch (e) {
-      this.logger.error(e, `Failed to buy postage batch for organization ${organizationId}`);
+      const message = `Failed to buy postage batch for organization ${organizationId}`;
+      this.alertService.sendAlert(message);
+      this.logger.error(e, message);
       await updateOrganizationsRow(organizationId, { postageBatchStatus: 'FAILED_TO_CREATE' });
     }
   }
@@ -254,6 +259,7 @@ export class BillingService {
     if (!organization.postageBatchId) {
       const message = `Organization ${organization.id} has no postage batch id. Failing top up.`;
       this.alertService.sendAlert(message);
+      this.logger.error(message);
       throw new InternalServerErrorException(message);
     }
     try {
@@ -264,7 +270,9 @@ export class BillingService {
       );
       return true;
     } catch (e) {
-      this.logger.error(e, `TopUp operation failed. Org: ${organization.id}`);
+      const message = `TopUp operation failed. Org: ${organization.id}`;
+      this.alertService.sendAlert(message, e);
+      this.logger.error(e, message);
       await updateOrganizationsRow(organization.id, { postageBatchStatus: 'FAILED_TO_TOP_UP' });
       return false;
     }
@@ -286,14 +294,18 @@ export class BillingService {
     const amount = config.amount.toFixed(0);
     const success: boolean = await this.tryTopUp(organization, amount, days);
     if (!success) {
-      this.logger.error(`TopUp operation failed. Skipping diluting. Org: ${organization.id}`);
+      const message = `TopUp operation failed. Skipping diluting. Org: ${organization.id}`;
+      this.alertService.sendAlert(message);
+      this.logger.error(message);
       return;
     }
     try {
       await this.beeService.dilute(organization.postageBatchId, config.depth);
       this.logger.info(`Dilute successful dilute on ${organization.postageBatchId} with depth: ${config.depth}`);
     } catch (e) {
-      this.logger.error(e, `Dilute operation failed. Org: ${organization.id}`);
+      const message = `Dilute operation failed. Org: ${organization.id}`;
+      this.alertService.sendAlert(message, e);
+      this.logger.error(e, message);
       await updateOrganizationsRow(organization.id, { postageBatchStatus: 'FAILED_TO_DILUTE' });
     }
   }

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as mail from '@sendgrid/mail';
 import { Types } from 'cafe-utility';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { AlertService } from '../alert/alert.service';
 
 @Injectable()
 export class EmailService {
@@ -18,6 +19,7 @@ export class EmailService {
     configService: ConfigService,
     @InjectPinoLogger(EmailService.name)
     private readonly logger: PinoLogger,
+    private alertService: AlertService,
   ) {
     this.sendGridApiKey = Types.asString(configService.get<string>('SENDGRID_API_KEY'), { name: 'SENDGRID_API_KEY' });
     this.verificationTemplateId = Types.asString(configService.get<string>('EMAIL_VERIFICATION_TEMPLATE_ID'), {
@@ -60,7 +62,9 @@ export class EmailService {
       await mail.send(msg);
       this.logger.info('Email verification email successfully sent');
     } catch (e) {
-      this.logger.error(e, 'Failed to send email');
+      const message = 'Failed to send email';
+      this.alertService.sendAlert(message, e);
+      this.logger.error(e, message);
     }
   }
 
@@ -82,7 +86,9 @@ export class EmailService {
       await mail.send(msg);
       this.logger.info('Password reset email successfully sent');
     } catch (e) {
-      this.logger.error(e, 'Failed to send email');
+      const message = 'Failed to send email';
+      this.alertService.sendAlert(message, e);
+      this.logger.error(e, message);
     }
   }
 }

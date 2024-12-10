@@ -2,12 +2,14 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { addMonths } from 'date-fns';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { getOnlyPlansRowOrThrow, OrganizationsRowId, PlansRow, PlansRowId, updatePlansRow } from 'src/DatabaseExtra';
+import { AlertService } from '../alert/alert.service';
 
 @Injectable()
 export class PlanService {
   constructor(
     @InjectPinoLogger(PlanService.name)
     private readonly logger: PinoLogger,
+    private alertService: AlertService,
   ) {}
 
   async getActivePlanForOrganization(organizationId: OrganizationsRowId): Promise<PlansRow> {
@@ -17,8 +19,10 @@ export class PlanService {
   async activatePlan(organizationId: OrganizationsRowId, planId: PlansRowId): Promise<PlansRow> {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
     if (existingActivePlan) {
-      this.logger.error(`Can't activate plan, there is already an active plan for this organization ${organizationId}`);
-      throw new BadRequestException('There is already an active plan for this organization', organizationId.toString());
+      const message = `Can't activate plan, there is already an active plan for this organization ${organizationId}`;
+      this.logger.error(message);
+      this.alertService.sendAlert(message);
+      throw new BadRequestException(message);
     }
 
     const now = new Date();
