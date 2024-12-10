@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Payment } from './payment.schema';
-import { PaymentService } from './payment.service';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
+import { ConfigService } from '@nestjs/config';
+import { Types } from 'cafe-utility';
+import { OrganizationsRowId, PlansRowId } from 'src/DatabaseExtra';
 import Stripe from 'stripe';
 import { PaymentNotificationService } from './payment-notification.service';
-import { ConfigService } from '@nestjs/config';
+import { PaymentService } from './payment.service';
 
 @Injectable()
 export class StripeService {
@@ -17,34 +16,27 @@ export class StripeService {
 
   constructor(
     configService: ConfigService,
-    @InjectModel(Payment.name) private paymentModel: Model<Payment>,
     private paymentService: PaymentService,
     private paymentNotificationService: PaymentNotificationService,
   ) {
-    this.frontendUrl = configService.get<string>('FRONTEND_URL');
-    this.webhookSecret = configService.get<string>('STRIPE_WEBHOOK_SECRET');
-    this.productId = configService.get<string>('STRIPE_PRODUCT_ID');
-    const apiKey = configService.get<string>('STRIPE_API_KEY');
+    this.frontendUrl = Types.asString(configService.get<string>('FRONTEND_URL'), { name: 'FRONTEND_URL' });
+    this.webhookSecret = Types.asString(configService.get<string>('STRIPE_WEBHOOK_SECRET'), {
+      name: 'STRIPE_WEBHOOK_SECRET',
+    });
+    this.productId = Types.asString(configService.get<string>('STRIPE_PRODUCT_ID'), { name: 'STRIPE_PRODUCT_ID' });
+    const apiKey = Types.asString(configService.get<string>('STRIPE_API_KEY'), { name: 'STRIPE_API_KEY' });
     this.stripeClient = new Stripe(apiKey);
   }
 
   async initPayment(
-    organizationId: string,
-    planId: string,
-    userId: string,
+    organizationId: OrganizationsRowId,
+    planId: PlansRowId,
     userEmail: string,
     amount: number,
     currency: string,
   ) {
     const merchantTransactionId = randomStringGenerator();
-    await this.paymentService.createPendingPayment(
-      amount,
-      currency,
-      merchantTransactionId,
-      organizationId,
-      userId,
-      planId,
-    );
+    await this.paymentService.createPendingPayment(amount, currency, merchantTransactionId, organizationId, planId);
 
     const session = await this.stripeClient.checkout.sessions.create({
       billing_address_collection: 'auto',

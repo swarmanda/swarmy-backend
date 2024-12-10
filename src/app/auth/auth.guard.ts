@@ -1,13 +1,17 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { Request } from 'express';
-import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from './public.decorator';
-import { UserService } from '../user/user.service';
-import { OrganizationService } from '../organization/organization.service';
-import { User } from '../user/user.schema';
-import { Organization } from '../organization/organization.schema';
 import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
+import { Types } from 'cafe-utility';
+import { Request } from 'express';
+import {
+  getOnlyOrganizationsRowOrNull,
+  getOnlyUsersRowOrNull,
+  OrganizationsRow,
+  OrganizationsRowId,
+  UsersRow,
+} from 'src/DatabaseExtra';
+import { IS_PUBLIC_KEY } from './public.decorator';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -17,10 +21,8 @@ export class AuthGuard implements CanActivate {
     configService: ConfigService,
     private jwtService: JwtService,
     private reflector: Reflector,
-    private userService: UserService,
-    private organizationService: OrganizationService,
   ) {
-    this.jwtSecret = configService.get<string>('JWT_SECRET');
+    this.jwtSecret = Types.asString(configService.get<string>('JWT_SECRET'), { name: 'JWT_SECRET' });
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -65,9 +67,9 @@ export class AuthGuard implements CanActivate {
   }
 
   private async getUserOrThrow(email: string) {
-    let user: User;
+    let user: UsersRow | null;
     try {
-      user = await this.userService.getUser(email);
+      user = await getOnlyUsersRowOrNull({ email });
     } catch {
       throw new UnauthorizedException('Unauthorized');
     }
@@ -77,17 +79,17 @@ export class AuthGuard implements CanActivate {
     return user;
   }
 
-  private async getOrganizationOrThrow(orgId: string) {
-    let org: Organization;
+  private async getOrganizationOrThrow(organizationId: OrganizationsRowId) {
+    let organization: OrganizationsRow | null;
     try {
-      org = await this.organizationService.getOrganization(orgId);
+      organization = await getOnlyOrganizationsRowOrNull({ id: organizationId });
     } catch {
       throw new UnauthorizedException('Unauthorized');
     }
-    if (!org || !org.enabled) {
+    if (!organization || !organization.enabled) {
       throw new UnauthorizedException('You shall not pass');
     }
-    return org;
+    return organization;
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {

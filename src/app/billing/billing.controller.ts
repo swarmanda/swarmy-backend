@@ -1,12 +1,11 @@
 import { BadRequestException, Body, Controller, HttpCode, Post, RawBodyRequest, Req } from '@nestjs/common';
-import { BillingService } from './billing.service';
-import { Public } from '../auth/public.decorator';
-import { UserInContext } from '../user/user.decorator';
-import { User } from '../user/user.schema';
 import { Request } from 'express';
-import { StartSubscriptionDto } from './start-subscription.dto';
+import { OrganizationsRow, UsersRow } from 'src/DatabaseExtra';
+import { Public } from '../auth/public.decorator';
 import { OrganizationInContext } from '../organization/organization.decorator';
-import { Organization } from '../organization/organization.schema';
+import { UserInContext } from '../user/user.decorator';
+import { BillingService } from './billing.service';
+import { StartSubscriptionDto } from './start-subscription.dto';
 
 @Controller()
 export class BillingController {
@@ -20,17 +19,20 @@ export class BillingController {
       throw new BadRequestException('signature has invalid format');
     }
 
+    if (!request.rawBody) {
+      throw new BadRequestException('request body is empty');
+    }
     return this.billingService.handleStripeNotification(request.rawBody, signature);
   }
 
   @Post('subscriptions/init')
-  startSubscriptionToPlan(@UserInContext() user: User, @Body() payload: StartSubscriptionDto) {
+  startSubscriptionToPlan(@UserInContext() user: UsersRow, @Body() payload: StartSubscriptionDto) {
     return this.billingService.initSubscriptionProcess(user, payload);
   }
 
   @Post('subscriptions/cancel')
   @HttpCode(200)
-  cancelPlan(@OrganizationInContext() org: Organization) {
-    return this.billingService.cancelPlan(org);
+  cancelPlan(@OrganizationInContext() organization: OrganizationsRow) {
+    return this.billingService.cancelPlan(organization);
   }
 }

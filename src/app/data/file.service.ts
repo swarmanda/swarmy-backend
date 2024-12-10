@@ -1,48 +1,43 @@
 import { Injectable } from '@nestjs/common';
-import { UploadResultDto } from './upload.result.dto';
-import { InjectModel } from '@nestjs/mongoose';
-import { User } from '../user/user.schema';
-import { Model } from 'mongoose';
-import { FileReference } from './file.schema';
 import * as imageThumbnail from 'image-thumbnail';
-import { Organization } from '../organization/organization.schema';
+import {
+  FileReferencesRow,
+  getFileReferencesRows,
+  getOnlyFileReferencesRowOrThrow,
+  insertFileReferencesRow,
+  OrganizationsRow,
+  OrganizationsRowId,
+} from 'src/DatabaseExtra';
+import { UploadResultDto } from './upload.result.dto';
 
 @Injectable()
 export class FileReferenceService {
-  constructor(
-    @InjectModel(FileReference.name)
-    private fileReferenceModel: Model<FileReference>,
-  ) {}
+  constructor() {}
 
   async createFileReference(
     hash: string,
-    organization: Organization,
+    organization: OrganizationsRow,
     file: Express.Multer.File,
     isWebsite: boolean,
-    user?: User,
   ): Promise<UploadResultDto> {
-    return await new this.fileReferenceModel({
-      userId: user?._id,
-      organizationId: organization._id,
+    const id = await insertFileReferencesRow({
+      organizationId: organization.id,
       hash,
       size: file.size,
       name: file.originalname,
       contentType: file.mimetype.split(';')[0],
       thumbnailBase64: await this.createThumbnail(file),
-      isWebsite,
-    }).save();
+      isWebsite: isWebsite ? 1 : 0,
+    });
+    return getOnlyFileReferencesRowOrThrow({ id });
   }
 
-  async getFileReferences(organizationId: string): Promise<FileReference[]> {
-    return (await this.fileReferenceModel
-      .find({
-        organizationId,
-      })
-      .sort([['_id', -1]])) as FileReference[];
+  async getFileReferences(organizationId: OrganizationsRowId): Promise<FileReferencesRow[]> {
+    return getFileReferencesRows({ organizationId }, { order: { column: 'id', direction: 'DESC' } });
   }
 
-  async getFileReference(org: Organization, hash: string) {
-    return (await this.fileReferenceModel.findOne({ organizationId: org._id, hash })) as FileReference;
+  async getFileReference(organization: OrganizationsRow, hash: string) {
+    return getOnlyFileReferencesRowOrThrow({ organizationId: organization.id, hash });
   }
 
   private isImage(mimetype: string) {

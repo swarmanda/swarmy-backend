@@ -39,10 +39,12 @@ export const subscriptionConfig = {
 };
 
 export function getDepthForRequestedStorage(requestedGbs: number) {
-  return gbToDepthMapping.sort((a, b) => a.depth - b.depth).find((mapping) => mapping.gbs >= requestedGbs).depth;
+  const storage = gbToDepthMapping.sort((a, b) => a.depth - b.depth).find((mapping) => mapping.gbs >= requestedGbs);
+  if (!storage) {
+    throw new Error(`Requested storage ${requestedGbs} is too high`);
+  }
+  return storage.depth;
 }
-
-// export function getCostOfPostageBatch(amount, depth: number) {}
 
 export function calculateDepthAndAmount(days: number, gbs: number) {
   const oneDay = 24000 * 24 * 60 * 12;

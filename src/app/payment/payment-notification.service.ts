@@ -1,19 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { PaymentNotification } from './payment-notification.schema';
+import { Strings } from 'cafe-utility';
+import { writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 @Injectable()
 export class PaymentNotificationService {
-  constructor(
-    @InjectModel(PaymentNotification.name)
-    private paymentNotificationModel: Model<PaymentNotification>,
-  ) {}
+  constructor() {}
 
   async saveNotification(type: string, body: object) {
-    return await new this.paymentNotificationModel({
-      type,
-      body,
-    }).save();
+    await writeFile(
+      join(tmpdir(), `stripe-${Date.now()}-${Strings.randomAlphanumeric(4)}.json`),
+      JSON.stringify({ type, body }),
+    );
   }
 }
