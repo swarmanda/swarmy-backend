@@ -19,7 +19,7 @@ export class ApiKeyService {
   ) {}
 
   async createApiKey(organizationId: OrganizationsRowId): Promise<ApiKeysRow> {
-    this.logger.info('creating api key for %s', organizationId);
+    this.logger.info(`creating api key for organization ${organizationId}`);
 
     const id = await insertApiKeysRow({
       apiKey: randomStringGenerator(),

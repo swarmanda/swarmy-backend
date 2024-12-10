@@ -37,10 +37,12 @@ export class UsageMetricsService {
   ) {
     const plan = await this.planService.getActivePlanForOrganization(organizationId);
     let available = 0;
-    if (type === 'UPLOADED_BYTES') {
-      available = plan.uploadSizeLimit;
-    } else if (type === 'DOWNLOADED_BYTES') {
-      available = plan.downloadSizeLimit;
+    if (plan) {
+      if (type === 'UPLOADED_BYTES') {
+        available = plan.uploadSizeLimit;
+      } else if (type === 'DOWNLOADED_BYTES') {
+        available = plan.downloadSizeLimit;
+      }
     }
     this.logger.info(
       `Couldn't find metric ${type} to upgrade for org: ${organizationId}, creating a new one for period: ${period}`,

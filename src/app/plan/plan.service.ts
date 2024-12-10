@@ -1,7 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { addMonths } from 'date-fns';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { getOnlyPlansRowOrThrow, OrganizationsRowId, PlansRow, PlansRowId, updatePlansRow } from 'src/DatabaseExtra';
+import {
+  getOnlyPlansRowOrNull,
+  getOnlyPlansRowOrThrow,
+  OrganizationsRowId,
+  PlansRow,
+  PlansRowId,
+  updatePlansRow,
+} from 'src/DatabaseExtra';
 import { AlertService } from '../alert/alert.service';
 
 @Injectable()
@@ -12,8 +19,8 @@ export class PlanService {
     private alertService: AlertService,
   ) {}
 
-  async getActivePlanForOrganization(organizationId: OrganizationsRowId): Promise<PlansRow> {
-    return getOnlyPlansRowOrThrow({ organizationId, status: 'ACTIVE' });
+  async getActivePlanForOrganization(organizationId: OrganizationsRowId): Promise<PlansRow | null> {
+    return getOnlyPlansRowOrNull({ organizationId, status: 'ACTIVE' });
   }
 
   async activatePlan(organizationId: OrganizationsRowId, planId: PlansRowId): Promise<PlansRow> {
@@ -39,6 +46,9 @@ export class PlanService {
 
   async scheduleActivePlanForCancellation(organizationId: OrganizationsRowId) {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
+    if (!existingActivePlan) {
+      return;
+    }
     await updatePlansRow(existingActivePlan.id, { cancelAt: existingActivePlan.paidUntil });
   }
 
