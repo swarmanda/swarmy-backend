@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { addMonths } from 'date-fns';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { getOnlyPlansRowOrThrow, PlansRow, updatePlansRow } from 'src/DatabaseExtra';
+import { getOnlyPlansRowOrThrow, OrganizationsRowId, PlansRow, PlansRowId, updatePlansRow } from 'src/DatabaseExtra';
 
 @Injectable()
 export class PlanService {
@@ -10,11 +10,11 @@ export class PlanService {
     private readonly logger: PinoLogger,
   ) {}
 
-  async getActivePlanForOrganization(organizationId: number): Promise<PlansRow> {
+  async getActivePlanForOrganization(organizationId: OrganizationsRowId): Promise<PlansRow> {
     return getOnlyPlansRowOrThrow({ organizationId, status: 'ACTIVE' });
   }
 
-  async activatePlan(organizationId: number, planId: number): Promise<PlansRow> {
+  async activatePlan(organizationId: OrganizationsRowId, planId: PlansRowId): Promise<PlansRow> {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
     if (existingActivePlan) {
       this.logger.error(`Can't activate plan, there is already an active plan for this organization ${organizationId}`);
@@ -28,17 +28,17 @@ export class PlanService {
     return getOnlyPlansRowOrThrow({ id: planId });
   }
 
-  async cancelPlan(organizationId: number, planId: number) {
+  async cancelPlan(organizationId: OrganizationsRowId, planId: PlansRowId) {
     const plan = await this.getPlanById(organizationId, planId);
     await updatePlansRow(plan.id, { status: 'CANCELLED' });
   }
 
-  async scheduleActivePlanForCancellation(organizationId: number) {
+  async scheduleActivePlanForCancellation(organizationId: OrganizationsRowId) {
     const existingActivePlan = await this.getActivePlanForOrganization(organizationId);
     await updatePlansRow(existingActivePlan.id, { cancelAt: existingActivePlan.paidUntil });
   }
 
-  async getPlanById(organizationId: number, planId: number) {
+  async getPlanById(organizationId: OrganizationsRowId, planId: PlansRowId) {
     return getOnlyPlansRowOrThrow({ organizationId, id: planId });
   }
 }

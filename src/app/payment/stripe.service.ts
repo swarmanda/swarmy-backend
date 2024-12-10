@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
 import { ConfigService } from '@nestjs/config';
 import { Types } from 'cafe-utility';
+import { OrganizationsRowId, PlansRowId } from 'src/DatabaseExtra';
 import Stripe from 'stripe';
 import { PaymentNotificationService } from './payment-notification.service';
 import { PaymentService } from './payment.service';
@@ -27,7 +28,13 @@ export class StripeService {
     this.stripeClient = new Stripe(apiKey);
   }
 
-  async initPayment(organizationId: number, planId: number, userEmail: string, amount: number, currency: string) {
+  async initPayment(
+    organizationId: OrganizationsRowId,
+    planId: PlansRowId,
+    userEmail: string,
+    amount: number,
+    currency: string,
+  ) {
     const merchantTransactionId = randomStringGenerator();
     await this.paymentService.createPendingPayment(amount, currency, merchantTransactionId, organizationId, planId);
 

@@ -6,7 +6,9 @@ import {
   insertPaymentsRow,
   insertPlansRow,
   OrganizationsRow,
+  OrganizationsRowId,
   PlansRow,
+  PlansRowId,
   updateOrganizationsRow,
   updatePaymentsRow,
   updatePlansRow,
@@ -166,7 +168,7 @@ export class BillingService {
     );
   }
 
-  private async activateNewPlan(organizationId: number, planId: number) {
+  private async activateNewPlan(organizationId: OrganizationsRowId, planId: PlansRowId) {
     this.logger.info(`Activating plan: ${planId}`);
     const plan = await this.planService.activatePlan(organizationId, planId);
     await this.usageMetricsService.upgradeCurrentMetrics(organizationId, plan.uploadSizeLimit, plan.downloadSizeLimit);

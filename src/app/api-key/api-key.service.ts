@@ -3,9 +3,11 @@ import { randomStringGenerator } from '@nestjs/common/utils/random-string-genera
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import {
   ApiKeysRow,
+  ApiKeysRowId,
   getApiKeysRows,
   getOnlyApiKeysRowOrThrow,
   insertApiKeysRow,
+  OrganizationsRowId,
   updateApiKeysRow,
 } from 'src/DatabaseExtra';
 
@@ -16,7 +18,7 @@ export class ApiKeyService {
     private readonly logger: PinoLogger,
   ) {}
 
-  async createApiKey(organizationId: number): Promise<ApiKeysRow> {
+  async createApiKey(organizationId: OrganizationsRowId): Promise<ApiKeysRow> {
     this.logger.info('creating api key for %s', organizationId);
 
     const id = await insertApiKeysRow({
@@ -27,7 +29,7 @@ export class ApiKeyService {
     return getOnlyApiKeysRowOrThrow({ id });
   }
 
-  async getApiKeys(organizationId: number): Promise<ApiKeysRow[]> {
+  async getApiKeys(organizationId: OrganizationsRowId): Promise<ApiKeysRow[]> {
     return getApiKeysRows({ organizationId });
   }
 
@@ -35,7 +37,7 @@ export class ApiKeyService {
     return getOnlyApiKeysRowOrThrow({ apiKey: secret });
   }
 
-  async revokeApiKey(id: number): Promise<ApiKeysRow> {
+  async revokeApiKey(id: ApiKeysRowId): Promise<ApiKeysRow> {
     await updateApiKeysRow(id, { status: 'REVOKED' });
     return getOnlyApiKeysRowOrThrow({ id });
   }

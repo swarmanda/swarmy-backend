@@ -6,6 +6,7 @@ import {
   getOnlyFileReferencesRowOrThrow,
   insertFileReferencesRow,
   OrganizationsRow,
+  OrganizationsRowId,
 } from 'src/DatabaseExtra';
 import { UploadResultDto } from './upload.result.dto';
 
@@ -31,7 +32,7 @@ export class FileReferenceService {
     return getOnlyFileReferencesRowOrThrow({ id });
   }
 
-  async getFileReferences(organizationId: number): Promise<FileReferencesRow[]> {
+  async getFileReferences(organizationId: OrganizationsRowId): Promise<FileReferencesRow[]> {
     return getFileReferencesRows({ organizationId }, { order: { column: 'id', direction: 'DESC' } });
   }
 

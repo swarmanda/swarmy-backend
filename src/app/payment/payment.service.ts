@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { getOnlyPaymentsRowOrThrow, insertPaymentsRow } from 'src/DatabaseExtra';
+import { getOnlyPaymentsRowOrThrow, insertPaymentsRow, OrganizationsRowId, PlansRowId } from 'src/DatabaseExtra';
 
 @Injectable()
 export class PaymentService {
@@ -9,8 +9,8 @@ export class PaymentService {
     amount: number,
     currency: string,
     merchantTransactionId: string,
-    organizationId: number,
-    planId: number,
+    organizationId: OrganizationsRowId,
+    planId: PlansRowId,
   ) {
     const id = await insertPaymentsRow({
       merchantTransactionId,

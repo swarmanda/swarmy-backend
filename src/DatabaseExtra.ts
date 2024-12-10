@@ -1,4 +1,4 @@
-import { getOnlyRowOrNull, getOnlyRowOrThrow, getRows, insert, update, updateWhere } from './Database';
+import { getOnlyRowOrNull, getOnlyRowOrThrow, getRows, insert, update } from './Database';
 
 type SelectOptions<T> = {
   order?: { column: keyof T; direction: 'ASC' | 'DESC' };
@@ -18,17 +18,19 @@ function buildSelect<T>(filter?: Partial<T>, options?: SelectOptions<T>): [strin
   return [where + order + limit, values];
 }
 
+export type ApiKeysRowId = number & { __brand: 'ApiKeysRowId' };
 export interface ApiKeysRow {
-  id: number;
-  organizationId: number;
+  id: ApiKeysRowId;
+  organizationId: OrganizationsRowId;
   apiKey: string;
   status: 'ACTIVE' | 'REVOKED';
   createdAt: Date;
 }
 
+export type FileReferencesRowId = number & { __brand: 'FileReferencesRowId' };
 export interface FileReferencesRow {
-  id: number;
-  organizationId: number;
+  id: FileReferencesRowId;
+  organizationId: OrganizationsRowId;
   thumbnailBase64?: string | null;
   name: string;
   contentType: string;
@@ -39,8 +41,9 @@ export interface FileReferencesRow {
   createdAt: Date;
 }
 
+export type OrganizationsRowId = number & { __brand: 'OrganizationsRowId' };
 export interface OrganizationsRow {
-  id: number;
+  id: OrganizationsRowId;
   name: string;
   postageBatchId?: string | null;
   postageBatchStatus?:
@@ -55,11 +58,12 @@ export interface OrganizationsRow {
   createdAt: Date;
 }
 
+export type PaymentsRowId = number & { __brand: 'PaymentsRowId' };
 export interface PaymentsRow {
-  id: number;
+  id: PaymentsRowId;
   merchantTransactionId: string;
-  organizationId: number;
-  planId: number;
+  organizationId: OrganizationsRowId;
+  planId: PlansRowId;
   amount: number;
   currency: string;
   status: 'PENDING' | 'SUCCESS' | 'FAILURE';
@@ -67,9 +71,10 @@ export interface PaymentsRow {
   createdAt: Date;
 }
 
+export type PlansRowId = number & { __brand: 'PlansRowId' };
 export interface PlansRow {
-  id: number;
-  organizationId: number;
+  id: PlansRowId;
+  organizationId: OrganizationsRowId;
   amount: number;
   currency: string;
   frequency: string;
@@ -84,26 +89,29 @@ export interface PlansRow {
   createdAt: Date;
 }
 
+export type StaticTextsRowId = number & { __brand: 'StaticTextsRowId' };
 export interface StaticTextsRow {
-  id: number;
+  id: StaticTextsRowId;
   label: string;
   value: string;
 }
 
+export type UsageMetricsRowId = number & { __brand: 'UsageMetricsRowId' };
 export interface UsageMetricsRow {
-  id: number;
-  organizationId: number;
+  id: UsageMetricsRowId;
+  organizationId: OrganizationsRowId;
   period: string;
   type: 'UPLOADED_BYTES' | 'DOWNLOADED_BYTES';
   available: number;
   used: number;
 }
 
+export type UsersRowId = number & { __brand: 'UsersRowId' };
 export interface UsersRow {
-  id: number;
+  id: UsersRowId;
   email: string;
   password: string;
-  organizationId: number;
+  organizationId: OrganizationsRowId;
   emailVerified: 0 | 1;
   emailVerificationCode: string;
   resetPasswordToken?: string | null;
@@ -112,14 +120,14 @@ export interface UsersRow {
 }
 
 export interface NewApiKeysRow {
-  organizationId: number;
+  organizationId: OrganizationsRowId;
   apiKey: string;
   status: 'ACTIVE' | 'REVOKED';
   createdAt?: Date | null;
 }
 
 export interface NewFileReferencesRow {
-  organizationId: number;
+  organizationId: OrganizationsRowId;
   thumbnailBase64?: string | null;
   name: string;
   contentType: string;
@@ -147,8 +155,8 @@ export interface NewOrganizationsRow {
 
 export interface NewPaymentsRow {
   merchantTransactionId: string;
-  organizationId: number;
-  planId: number;
+  organizationId: OrganizationsRowId;
+  planId: PlansRowId;
   amount: number;
   currency: string;
   status: 'PENDING' | 'SUCCESS' | 'FAILURE';
@@ -157,7 +165,7 @@ export interface NewPaymentsRow {
 }
 
 export interface NewPlansRow {
-  organizationId: number;
+  organizationId: OrganizationsRowId;
   amount: number;
   currency: string;
   frequency: string;
@@ -178,7 +186,7 @@ export interface NewStaticTextsRow {
 }
 
 export interface NewUsageMetricsRow {
-  organizationId: number;
+  organizationId: OrganizationsRowId;
   period: string;
   type: 'UPLOADED_BYTES' | 'DOWNLOADED_BYTES';
   available: number;
@@ -188,7 +196,7 @@ export interface NewUsageMetricsRow {
 export interface NewUsersRow {
   email: string;
   password: string;
-  organizationId: number;
+  organizationId: OrganizationsRowId;
   emailVerified?: 0 | 1 | null;
   emailVerificationCode: string;
   resetPasswordToken?: string | null;
@@ -388,130 +396,72 @@ export async function getOnlyUsersRowOrThrow(
   return getOnlyRowOrThrow('SELECT * FROM swarmy.users' + query, ...values) as unknown as UsersRow;
 }
 
-export async function updateApiKeysRow(id: number, object: Partial<NewApiKeysRow>): Promise<void> {
+export async function updateApiKeysRow(id: ApiKeysRowId, object: Partial<NewApiKeysRow>): Promise<void> {
   await update('swarmy.apiKeys', id, object);
 }
 
-export async function updateApiKeysRowWhere(
-  column: keyof ApiKeysRow,
-  value: string,
-  object: Partial<NewApiKeysRow>,
+export async function updateFileReferencesRow(
+  id: FileReferencesRowId,
+  object: Partial<NewFileReferencesRow>,
 ): Promise<void> {
-  await updateWhere('swarmy.apiKeys', column, value, object);
-}
-
-export async function updateFileReferencesRow(id: number, object: Partial<NewFileReferencesRow>): Promise<void> {
   await update('swarmy.fileReferences', id, object);
 }
 
-export async function updateFileReferencesRowWhere(
-  column: keyof FileReferencesRow,
-  value: string,
-  object: Partial<NewFileReferencesRow>,
+export async function updateOrganizationsRow(
+  id: OrganizationsRowId,
+  object: Partial<NewOrganizationsRow>,
 ): Promise<void> {
-  await updateWhere('swarmy.fileReferences', column, value, object);
-}
-
-export async function updateOrganizationsRow(id: number, object: Partial<NewOrganizationsRow>): Promise<void> {
   await update('swarmy.organizations', id, object);
 }
 
-export async function updateOrganizationsRowWhere(
-  column: keyof OrganizationsRow,
-  value: string,
-  object: Partial<NewOrganizationsRow>,
-): Promise<void> {
-  await updateWhere('swarmy.organizations', column, value, object);
-}
-
-export async function updatePaymentsRow(id: number, object: Partial<NewPaymentsRow>): Promise<void> {
+export async function updatePaymentsRow(id: PaymentsRowId, object: Partial<NewPaymentsRow>): Promise<void> {
   await update('swarmy.payments', id, object);
 }
 
-export async function updatePaymentsRowWhere(
-  column: keyof PaymentsRow,
-  value: string,
-  object: Partial<NewPaymentsRow>,
-): Promise<void> {
-  await updateWhere('swarmy.payments', column, value, object);
-}
-
-export async function updatePlansRow(id: number, object: Partial<NewPlansRow>): Promise<void> {
+export async function updatePlansRow(id: PlansRowId, object: Partial<NewPlansRow>): Promise<void> {
   await update('swarmy.plans', id, object);
 }
 
-export async function updatePlansRowWhere(
-  column: keyof PlansRow,
-  value: string,
-  object: Partial<NewPlansRow>,
-): Promise<void> {
-  await updateWhere('swarmy.plans', column, value, object);
-}
-
-export async function updateStaticTextsRow(id: number, object: Partial<NewStaticTextsRow>): Promise<void> {
+export async function updateStaticTextsRow(id: StaticTextsRowId, object: Partial<NewStaticTextsRow>): Promise<void> {
   await update('swarmy.staticTexts', id, object);
 }
 
-export async function updateStaticTextsRowWhere(
-  column: keyof StaticTextsRow,
-  value: string,
-  object: Partial<NewStaticTextsRow>,
-): Promise<void> {
-  await updateWhere('swarmy.staticTexts', column, value, object);
-}
-
-export async function updateUsageMetricsRow(id: number, object: Partial<NewUsageMetricsRow>): Promise<void> {
+export async function updateUsageMetricsRow(id: UsageMetricsRowId, object: Partial<NewUsageMetricsRow>): Promise<void> {
   await update('swarmy.usageMetrics', id, object);
 }
 
-export async function updateUsageMetricsRowWhere(
-  column: keyof UsageMetricsRow,
-  value: string,
-  object: Partial<NewUsageMetricsRow>,
-): Promise<void> {
-  await updateWhere('swarmy.usageMetrics', column, value, object);
-}
-
-export async function updateUsersRow(id: number, object: Partial<NewUsersRow>): Promise<void> {
+export async function updateUsersRow(id: UsersRowId, object: Partial<NewUsersRow>): Promise<void> {
   await update('swarmy.users', id, object);
 }
 
-export async function updateUsersRowWhere(
-  column: keyof UsersRow,
-  value: string,
-  object: Partial<NewUsersRow>,
-): Promise<void> {
-  await updateWhere('swarmy.users', column, value, object);
+export async function insertApiKeysRow(object: NewApiKeysRow): Promise<ApiKeysRowId> {
+  return insert('swarmy.apiKeys', object as unknown as Record<string, unknown>) as Promise<ApiKeysRowId>;
 }
 
-export async function insertApiKeysRow(object: NewApiKeysRow): Promise<number> {
-  return insert('swarmy.apiKeys', object as unknown as Record<string, unknown>);
+export async function insertFileReferencesRow(object: NewFileReferencesRow): Promise<FileReferencesRowId> {
+  return insert('swarmy.fileReferences', object as unknown as Record<string, unknown>) as Promise<FileReferencesRowId>;
 }
 
-export async function insertFileReferencesRow(object: NewFileReferencesRow): Promise<number> {
-  return insert('swarmy.fileReferences', object as unknown as Record<string, unknown>);
+export async function insertOrganizationsRow(object: NewOrganizationsRow): Promise<OrganizationsRowId> {
+  return insert('swarmy.organizations', object as unknown as Record<string, unknown>) as Promise<OrganizationsRowId>;
 }
 
-export async function insertOrganizationsRow(object: NewOrganizationsRow): Promise<number> {
-  return insert('swarmy.organizations', object as unknown as Record<string, unknown>);
+export async function insertPaymentsRow(object: NewPaymentsRow): Promise<PaymentsRowId> {
+  return insert('swarmy.payments', object as unknown as Record<string, unknown>) as Promise<PaymentsRowId>;
 }
 
-export async function insertPaymentsRow(object: NewPaymentsRow): Promise<number> {
-  return insert('swarmy.payments', object as unknown as Record<string, unknown>);
+export async function insertPlansRow(object: NewPlansRow): Promise<PlansRowId> {
+  return insert('swarmy.plans', object as unknown as Record<string, unknown>) as Promise<PlansRowId>;
 }
 
-export async function insertPlansRow(object: NewPlansRow): Promise<number> {
-  return insert('swarmy.plans', object as unknown as Record<string, unknown>);
+export async function insertStaticTextsRow(object: NewStaticTextsRow): Promise<StaticTextsRowId> {
+  return insert('swarmy.staticTexts', object as unknown as Record<string, unknown>) as Promise<StaticTextsRowId>;
 }
 
-export async function insertStaticTextsRow(object: NewStaticTextsRow): Promise<number> {
-  return insert('swarmy.staticTexts', object as unknown as Record<string, unknown>);
+export async function insertUsageMetricsRow(object: NewUsageMetricsRow): Promise<UsageMetricsRowId> {
+  return insert('swarmy.usageMetrics', object as unknown as Record<string, unknown>) as Promise<UsageMetricsRowId>;
 }
 
-export async function insertUsageMetricsRow(object: NewUsageMetricsRow): Promise<number> {
-  return insert('swarmy.usageMetrics', object as unknown as Record<string, unknown>);
-}
-
-export async function insertUsersRow(object: NewUsersRow): Promise<number> {
-  return insert('swarmy.users', object as unknown as Record<string, unknown>);
+export async function insertUsersRow(object: NewUsersRow): Promise<UsersRowId> {
+  return insert('swarmy.users', object as unknown as Record<string, unknown>) as Promise<UsersRowId>;
 }

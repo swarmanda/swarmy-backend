@@ -5,6 +5,7 @@ import {
   getOnlyUsageMetricsRowOrThrow,
   getUsageMetricsRows,
   insertUsageMetricsRow,
+  OrganizationsRowId,
   updateUsageMetricsRow,
   UsageMetricsRow,
 } from 'src/DatabaseExtra';
@@ -29,7 +30,7 @@ export class UsageMetricsService {
   }
 
   private async initializeMetrics(
-    organizationId: number,
+    organizationId: OrganizationsRowId,
     type: 'UPLOADED_BYTES' | 'DOWNLOADED_BYTES',
     period: string,
     value: number,
@@ -55,7 +56,7 @@ export class UsageMetricsService {
   }
 
   async updateMetrics(
-    organizationId: number,
+    organizationId: OrganizationsRowId,
     period: string,
     type: UsageMetricType,
     update: {
@@ -68,7 +69,7 @@ export class UsageMetricsService {
     return getOnlyUsageMetricsRowOrNull({ organizationId, period, type });
   }
 
-  async getForOrganization(organizationId: number, type: UsageMetricType): Promise<UsageMetricsRow> {
+  async getForOrganization(organizationId: OrganizationsRowId, type: UsageMetricType): Promise<UsageMetricsRow> {
     const metrics = await getUsageMetricsRows({ organizationId, type });
     let metric = metrics.find((x) => x.period === this.getCurrentPeriod() || x.period === LIFETIME_PERIOD);
     if (!metric) {
@@ -78,25 +79,25 @@ export class UsageMetricsService {
     return metric;
   }
 
-  async getAllForOrganization(organizationId: number): Promise<UsageMetricsRow[]> {
+  async getAllForOrganization(organizationId: OrganizationsRowId): Promise<UsageMetricsRow[]> {
     const metrics = await getUsageMetricsRows({ organizationId });
     return metrics.filter((x) => {
       return x.period === this.getCurrentPeriod() || x.period === LIFETIME_PERIOD;
     });
   }
 
-  async upgradeCurrentMetrics(organizationId: number, uploadSizeLimit: number, downloadSizeLimit: number) {
+  async upgradeCurrentMetrics(organizationId: OrganizationsRowId, uploadSizeLimit: number, downloadSizeLimit: number) {
     await this.upsert(organizationId, 'UPLOADED_BYTES', LIFETIME_PERIOD, uploadSizeLimit);
     await this.upsert(organizationId, 'DOWNLOADED_BYTES', this.getCurrentPeriod(), downloadSizeLimit);
   }
 
-  async resetCurrentMetrics(organizationId: number) {
+  async resetCurrentMetrics(organizationId: OrganizationsRowId) {
     await this.upsert(organizationId, 'UPLOADED_BYTES', LIFETIME_PERIOD, 0, 0);
     await this.upsert(organizationId, 'DOWNLOADED_BYTES', this.getCurrentPeriod(), 0, 0);
   }
 
   private async upsert(
-    organizationId: number,
+    organizationId: OrganizationsRowId,
     type: UsageMetricType,
     period: string,
     available: number,

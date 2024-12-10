@@ -4,7 +4,13 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Types } from 'cafe-utility';
 import { Request } from 'express';
-import { getOnlyOrganizationsRowOrNull, getOnlyUsersRowOrNull, OrganizationsRow, UsersRow } from 'src/DatabaseExtra';
+import {
+  getOnlyOrganizationsRowOrNull,
+  getOnlyUsersRowOrNull,
+  OrganizationsRow,
+  OrganizationsRowId,
+  UsersRow,
+} from 'src/DatabaseExtra';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 @Injectable()
@@ -73,7 +79,7 @@ export class AuthGuard implements CanActivate {
     return user;
   }
 
-  private async getOrganizationOrThrow(organizationId: number) {
+  private async getOrganizationOrThrow(organizationId: OrganizationsRowId) {
     let organization: OrganizationsRow | null;
     try {
       organization = await getOnlyOrganizationsRowOrNull({ id: organizationId });

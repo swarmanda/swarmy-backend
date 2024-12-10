@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { getOnlyOrganizationsRowOrThrow, insertOrganizationsRow, OrganizationsRow } from 'src/DatabaseExtra';
+import {
+  getOnlyOrganizationsRowOrThrow,
+  insertOrganizationsRow,
+  OrganizationsRow,
+  OrganizationsRowId,
+} from 'src/DatabaseExtra';
 
 @Injectable()
 export class OrganizationService {
@@ -9,7 +14,7 @@ export class OrganizationService {
     private readonly logger: PinoLogger,
   ) {}
 
-  async getOrganization(id: number): Promise<OrganizationsRow> {
+  async getOrganization(id: OrganizationsRowId): Promise<OrganizationsRow> {
     return getOnlyOrganizationsRowOrThrow({ id });
   }
 

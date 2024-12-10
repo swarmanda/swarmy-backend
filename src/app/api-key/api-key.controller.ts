@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Post, Put } from '@nestjs/common';
-import { UsersRow } from 'src/DatabaseExtra';
+import { ApiKeysRowId, UsersRow } from 'src/DatabaseExtra';
 import { UserInContext } from '../user/user.decorator';
 import { ApiKeyService } from './api-key.service';
 
@@ -19,6 +19,6 @@ export class ApiKeyController {
 
   @Put('/:id/revoke')
   revokeApiKey(@Param('id') id: number) {
-    return this.apiKeyService.revokeApiKey(id);
+    return this.apiKeyService.revokeApiKey(id as ApiKeysRowId);
   }
 }
