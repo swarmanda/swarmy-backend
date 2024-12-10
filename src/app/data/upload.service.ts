@@ -41,12 +41,14 @@ export class UploadService {
     const metric = await this.validateUploadLimit(organization, size);
     await this.usageMetricsService.increment(metric, size);
     // todo add decrement on failure
-    const result = await this.beeService.upload(
-      organization.postageBatchId,
-      stream,
-      file.originalname,
-      uploadAsWebsite,
-    );
+    const result = await this.beeService
+      .upload(organization.postageBatchId, stream, file.originalname, uploadAsWebsite)
+      .catch((e) => {
+        const message = `Failed to upload file "${file.originalname}" of size ${file.size} for organization ${organization.id}`;
+        this.alertService.sendAlert(message, e);
+        this.logger.error(e, message);
+        throw new BadRequestException('Failed to upload file');
+      });
 
     const fileReference = await this.fileReferenceService.getFileReference(organization, result.reference);
     if (fileReference) {
