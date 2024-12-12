@@ -164,7 +164,7 @@ export class UserService {
     await updateUsersRow(user.id, { resetPasswordToken: token });
 
     const resetUrl = `${this.frontendUrl}/reset-password?token=${token}`;
-    await this.emailService.sendPasswordResetEmail(resetUrl, email);
+    await this.emailService.sendPasswordResetEmail(email, resetUrl);
   }
 
   async resetPassword(password: string, token: string) {

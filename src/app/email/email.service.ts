@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Types } from 'cafe-utility';
-import formData from 'form-data';
+import * as formData from 'form-data';
 import Mailgun from 'mailgun.js';
 import { IMailgunClient } from 'mailgun.js/Interfaces';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
@@ -34,6 +34,7 @@ export class EmailService {
     return this.sendEmail(
       to,
       'Email verification',
+      `Verify your email address by clicking on the link below: ${verificationUrl}`,
       makeEmailTemplate(
         'Thanks for signing up!',
         'Please verify your email address to get access to the service by clicking on the button below.',
@@ -47,6 +48,7 @@ export class EmailService {
     return this.sendEmail(
       to,
       'Password reset',
+      `Reset your password by clicking on the link below within the next 60 minutes: ${resetUrl}`,
       makeEmailTemplate(
         'Reset your password',
         'Click on the button below  within the next 60 minutes to reset your password for your Swarmy account.',
