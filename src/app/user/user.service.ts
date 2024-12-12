@@ -44,7 +44,7 @@ export class UserService {
     this.logger.info('User created: %s', registerUserDto.email);
 
     const verificationUrl = this.getVerificationUrl(emailVerificationCode);
-    await this.emailService.sendEmailVerification(registerUserDto.email, verificationUrl);
+    await this.emailService.sendEmailVerificationEmail(registerUserDto.email, verificationUrl);
   }
 
   private async verifyUniqueEmail(email: string) {
@@ -75,7 +75,7 @@ export class UserService {
     const newCode = this.generateRandomTokenWithTimestamp();
     await updateUsersRow(user.id, { emailVerificationCode: newCode });
     const verificationUrl = this.getVerificationUrl(newCode);
-    await this.emailService.sendEmailVerification(user.email, verificationUrl);
+    await this.emailService.sendEmailVerificationEmail(user.email, verificationUrl);
   }
 
   private getVerificationUrl(code: string) {
@@ -164,7 +164,7 @@ export class UserService {
     await updateUsersRow(user.id, { resetPasswordToken: token });
 
     const resetUrl = `${this.frontendUrl}/reset-password?token=${token}`;
-    await this.emailService.sendPasswordReset(resetUrl, email);
+    await this.emailService.sendPasswordResetEmail(resetUrl, email);
   }
 
   async resetPassword(password: string, token: string) {

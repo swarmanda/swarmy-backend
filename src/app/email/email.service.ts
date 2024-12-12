@@ -1,19 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as mail from '@sendgrid/mail';
 import { Types } from 'cafe-utility';
+import formData from 'form-data';
+import Mailgun from 'mailgun.js';
+import { IMailgunClient } from 'mailgun.js/Interfaces';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { AlertService } from '../alert/alert.service';
+import { makeEmailTemplate } from './email.template';
 
 @Injectable()
 export class EmailService {
-  private readonly sendGridApiKey: string;
-  private readonly verificationTemplateId: string;
-  private readonly emailVerificationFromEmail: string;
-  private readonly emailVerificationFromName: string;
-  private readonly passwordResetTemplateId: string;
-  private readonly passwordResetFromEmail: string;
-  private readonly passwordResetFromName: string;
+  private readonly mailgunApiKey: string;
+  private readonly mailgunDomain: string;
+  private readonly mailgunSender: string;
+  private readonly mailgunUrl: string;
+  private client: IMailgunClient;
 
   constructor(
     configService: ConfigService,
@@ -21,74 +22,54 @@ export class EmailService {
     private readonly logger: PinoLogger,
     private alertService: AlertService,
   ) {
-    this.sendGridApiKey = Types.asString(configService.get<string>('SENDGRID_API_KEY'), { name: 'SENDGRID_API_KEY' });
-    this.verificationTemplateId = Types.asString(configService.get<string>('EMAIL_VERIFICATION_TEMPLATE_ID'), {
-      name: 'EMAIL_VERIFICATION_TEMPLATE_ID',
-    });
-    this.emailVerificationFromEmail = Types.asString(configService.get<string>('EMAIL_VERIFICATION_FROM_EMAIL'), {
-      name: 'EMAIL_VERIFICATION_FROM_EMAIL',
-    });
-    this.emailVerificationFromName = Types.asString(configService.get<string>('EMAIL_VERIFICATION_FROM_NAME'), {
-      name: 'EMAIL_VERIFICATION_FROM_NAME',
-    });
-    this.passwordResetTemplateId = Types.asString(configService.get<string>('PASSWORD_RESET_TEMPLATE_ID'), {
-      name: 'PASSWORD_RESET_TEMPLATE_ID',
-    });
-    this.passwordResetFromEmail = Types.asString(configService.get<string>('PASSWORD_RESET_FROM_EMAIL'), {
-      name: 'PASSWORD_RESET_FROM_EMAIL',
-    });
-    this.passwordResetFromName = Types.asString(configService.get<string>('PASSWORD_RESET_FROM_NAME'), {
-      name: 'PASSWORD_RESET_FROM_NAME',
-    });
-
-    mail.setApiKey(this.sendGridApiKey);
+    this.mailgunApiKey = Types.asString(configService.get<string>('MAILGUN_API_KEY'), { name: 'MAILGUN_API_KEY' });
+    this.mailgunDomain = Types.asString(configService.get<string>('MAILGUN_DOMAIN'), { name: 'MAILGUN_DOMAIN' });
+    this.mailgunSender = Types.asString(configService.get<string>('MAILGUN_SENDER'), { name: 'MAILGUN_SENDER' });
+    this.mailgunUrl = Types.asString(configService.get<string>('MAILGUN_URL'), { name: 'MAILGUN_URL' });
+    const mailgun = new Mailgun(formData);
+    this.client = mailgun.client({ username: 'api', key: this.mailgunApiKey, url: this.mailgunUrl });
   }
 
-  async sendEmailVerification(recipient: string, verificationLink: string) {
-    const msg = {
-      to: recipient,
-      from: {
-        email: this.emailVerificationFromEmail,
-        name: this.emailVerificationFromName,
-      },
-      subject: 'Verify your email',
-      templateId: this.verificationTemplateId,
-      dynamic_template_data: {
-        VERIFICATION_LINK: verificationLink,
-      },
-    };
-    try {
-      this.logger.info('Sending verification email');
-      await mail.send(msg);
-      this.logger.info('Email verification email successfully sent');
-    } catch (e) {
-      const message = 'Failed to send email';
-      this.alertService.sendAlert(message, e);
-      this.logger.error(e, message);
-    }
+  public async sendEmailVerificationEmail(to: string, verificationUrl: string) {
+    return this.sendEmail(
+      to,
+      'Email verification',
+      makeEmailTemplate(
+        'Thanks for signing up!',
+        'Please verify your email address to get access to the service by clicking on the button below.',
+        'Verify Email Now',
+        verificationUrl,
+      ),
+    );
   }
 
-  async sendPasswordReset(resetUrl: string, recipient: string) {
-    const msg = {
-      to: recipient,
-      from: {
-        email: this.passwordResetFromEmail,
-        name: this.passwordResetFromName,
-      },
-      subject: 'Verify your email',
-      templateId: this.passwordResetTemplateId,
-      dynamic_template_data: {
-        RESET_URL: resetUrl,
-      },
-    };
-    try {
-      this.logger.info('Sending password reset email');
-      await mail.send(msg);
-      this.logger.info('Password reset email successfully sent');
-    } catch (e) {
-      const message = 'Failed to send email';
-      this.alertService.sendAlert(message, e);
-      this.logger.error(e, message);
-    }
+  public async sendPasswordResetEmail(to: string, resetUrl: string) {
+    return this.sendEmail(
+      to,
+      'Password reset',
+      makeEmailTemplate(
+        'Reset your password',
+        'Click on the button below  within the next 60 minutes to reset your password for your Swarmy account.',
+        'Reset Password',
+        resetUrl,
+      ),
+    );
+  }
+
+  private async sendEmail(to: string, subject: string, text: string, html?: string) {
+    await this.client.messages
+      .create(this.mailgunDomain, {
+        from: this.mailgunSender,
+        to: [to],
+        subject,
+        text,
+        html,
+      })
+      .catch((error) => {
+        const message = `Failed to send email to ${to} with subject ${subject}`;
+        this.alertService.sendAlert(message, error);
+        this.logger.error(message, error);
+        throw error;
+      });
   }
 }
