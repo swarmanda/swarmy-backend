@@ -136,38 +136,32 @@ export class BillingService {
     await updatePaymentsRow(payment.id, { status: 'SUCCESS' });
 
     const organization = await this.organizationService.getOrganization(payment.organizationId);
-    const organizationId = organization.id;
     const planIdToActivate = payment.planId;
 
-    const planToActivate = await this.planService.getPlanById(organizationId, planIdToActivate);
+    const planToActivate = await this.planService.getPlanById(organization.id, planIdToActivate);
     if (planToActivate.status !== 'PENDING_PAYMENT') {
-      const message = `Status of plan to activate must be PENDING_PAYMENT, but it's ${planToActivate.status}. Plan: ${planIdToActivate}`;
+      const message = `Plan ${planIdToActivate} to activate must be PENDING_PAYMENT, but it's ${planToActivate.status}`;
       this.alertService.sendAlert(message);
       this.logger.error(message);
       return;
     }
-    const activePlan = await this.planService.getActivePlanForOrganization(organizationId);
+    const activePlan = await this.planService.getActivePlanForOrganization(organization.id);
     if (activePlan) {
-      await this.upgradeExistingPlanAndMetrics(activePlan, planToActivate);
-      const newPlan = await this.activateNewPlan(organizationId, planIdToActivate);
+      await this.cancelExistingPlanForUpgrade(activePlan, planToActivate);
+      const newPlan = await this.activateNewPlan(organization.id, planIdToActivate);
       this.topUpAndDilute(organization, newPlan);
     } else {
-      const plan = await this.activateNewPlan(organizationId, planIdToActivate);
+      const plan = await this.activateNewPlan(organization.id, planIdToActivate);
       this.buyPostageBatch(organization, plan);
     }
   }
 
-  private async upgradeExistingPlanAndMetrics(planToUpgrade: PlansRow, newPlan: PlansRow) {
-    this.logger.info(`Upgrading plan ${planToUpgrade.id}`);
-    updatePlansRow(planToUpgrade.id, {
+  private async cancelExistingPlanForUpgrade(planToCancel: PlansRow, planToUpgradeTo: PlansRow) {
+    this.logger.info(`Cancelling plan ${planToCancel.id}, upgrading to ${planToUpgradeTo.id}`);
+    updatePlansRow(planToCancel.id, {
       status: 'CANCELLED',
-      statusReason: `UPGRADED_TO: ${newPlan.id}`,
+      statusReason: `UPGRADED_TO: ${planToUpgradeTo.id}`,
     });
-    await this.usageMetricsService.upgradeCurrentMetrics(
-      planToUpgrade.organizationId,
-      newPlan.uploadSizeLimit,
-      newPlan.downloadSizeLimit,
-    );
   }
 
   private async activateNewPlan(organizationId: OrganizationsRowId, planId: PlansRowId) {
