@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Interval } from '@nestjs/schedule';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { BeeService } from '../bee/bee.service';
+import { BZZ } from '../token/bzz';
 
 const TEN_MINUTES = 10 * 60 * 1000;
 
@@ -16,8 +17,6 @@ export class WalletMonitorScheduledService {
   @Interval(TEN_MINUTES)
   async checkPostageBatchTTL() {
     const wallet = await this.beeService.getWallet();
-    const bzzBalanceTimes100 = BigInt(wallet.bzzBalance) / 100000000000000n;
-    const bzzBalance = (Number(bzzBalanceTimes100) / 100).toFixed(2);
-    this.logger.info(`Wallet Monitor - balance is ${bzzBalance} BZZ`);
+    this.logger.info(`Wallet Monitor - balance is ${new BZZ(wallet.bzzBalance).toString()} BZZ`);
   }
 }

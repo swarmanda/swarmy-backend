@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Types } from 'cafe-utility';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Readable } from 'stream';
+import { BZZ } from '../token/bzz';
 
 @Injectable()
 export class BeeService {
@@ -47,8 +48,7 @@ export class BeeService {
       return 99999999;
     }
     const wallet = await this.getWallet();
-    const bzzBalanceTimes100 = BigInt(wallet.bzzBalance) / 100000000000000n;
-    return Number(bzzBalanceTimes100) / 100;
+    return new BZZ(wallet.bzzBalance).toBZZ(2);
   }
 
   async getPostageBatch(postageBatchId: string) {

@@ -1,3 +1,5 @@
+import { BZZ } from '../token/bzz';
+
 export const subscriptionConfig = {
   currency: 'EUR',
   storageCapacity: {
@@ -50,8 +52,8 @@ export function calculateDepthAndAmount(days: number, gbs: number) {
   const oneDay = 24000 * 24 * 60 * 12;
   const amount = days * oneDay;
   const depth = getDepthForRequestedStorage(gbs);
-  const bzzPriceTimes100 = (2n ** BigInt(depth) * BigInt(amount)) / 100000000000000n;
-  const bzzPrice = Number(bzzPriceTimes100) / 100;
+  const bzzPrice = new BZZ(2n ** BigInt(depth) * BigInt(amount)).toBZZ(2);
+
   return { amount, depth, bzzPrice };
 }
 
