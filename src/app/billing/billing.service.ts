@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
-import { Strings } from 'cafe-utility';
-import { addMonths } from 'date-fns';
+import { Dates, Strings } from 'cafe-utility';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import {
   getOnlyPlansRowOrThrow,
@@ -205,7 +204,7 @@ export class BillingService {
         this.alertService.sendAlert(message);
         throw new InternalServerErrorException(message);
       }
-      const paidUntil = addMonths(plan.paidUntil, 1);
+      const paidUntil = new Date(Date.now() + Dates.days(31));
       await updatePlansRow(plan.id, { paidUntil });
       await insertPaymentsRow({
         amount: object.amount_paid,

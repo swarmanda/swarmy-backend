@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { addMonths } from 'date-fns';
+import { Dates } from 'cafe-utility';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import {
   getOnlyPlansRowOrNull,
@@ -32,8 +32,7 @@ export class PlanService {
       throw new BadRequestException(message);
     }
 
-    const now = new Date();
-    const paidUntil = addMonths(now, 1);
+    const paidUntil = new Date(Date.now() + Dates.days(31));
     await updatePlansRow(planId, { status: 'ACTIVE', paidUntil });
     this.logger.info('Plan activated ', planId);
     return getOnlyPlansRowOrThrow({ id: planId });
